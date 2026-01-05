@@ -153,10 +153,9 @@ cd drx/v1
 cp .env.example .env
 # Edit .env with your API keys:
 #   OPENROUTER_API_KEY=sk-or-...
-#   TAVILY_API_KEY=tvly-...
 
 # Launch all services
-docker compose up -d
+docker compose -f deployment/docker-compose.yaml up -d
 
 # Services started:
 #   - API:      http://localhost:8000
@@ -179,17 +178,16 @@ pip install -e ".[dev,eval]"
 pip install -r requirements.txt
 
 # Start infrastructure
-docker compose up -d postgres redis phoenix
+docker compose -f deployment/docker-compose.yaml up -d postgres redis phoenix
 
 # Initialize database
 psql $DATABASE_URL < schemas/postgres_schema.sql
 
 # Run API server
 uvicorn src.api.main:app --reload --port 8000
-
-# Run Celery worker (in another terminal)
-celery -A src.worker worker -l info
 ```
+
+> **Note:** The system currently runs synchronously. Celery worker support for async task processing is planned for a future release.
 
 ### Option 3: Quick Test
 
