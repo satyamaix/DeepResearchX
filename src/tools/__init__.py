@@ -2,9 +2,12 @@
 DRX Tools Package - Search and retrieval tools for deep research.
 
 This package provides:
-- TavilySearchTool: Web search via Tavily API (1000 free/month)
-- OpenRouterSearchTool: Web search via OpenRouter (Exa-powered)
+- OpenRouterSearchTool: Native web search via OpenRouter (preferred, no extra cost)
+- TavilySearchTool: Web search via Tavily API (fallback, 1000 free/month)
 - RAGRetriever: Vector similarity search with pgvector
+
+OpenRouter native search is the primary search method, available for
+Anthropic, OpenAI, Perplexity, and xAI models with no additional per-search cost.
 
 All tools follow a consistent interface defined in base.py.
 """
@@ -36,7 +39,11 @@ from .openrouter_search import (
     OpenRouterClient,
     get_openrouter_search_tool,
     create_openrouter_search_tool,
-    OPENROUTER_SEARCH_COST_USD,
+    OPENROUTER_EXA_COST_PER_RESULT_USD,
+    OPENROUTER_NATIVE_COST_USD,
+    SEARCH_ENGINE_NATIVE,
+    SEARCH_ENGINE_EXA,
+    NATIVE_SEARCH_MODELS,
 )
 
 from .rag_retriever import (
@@ -63,17 +70,21 @@ __all__ = [
     "tool_with_retry",
     "ToolFactory",
     "SearchResults",
-    # Tavily search
-    "TavilySearchTool",
-    "get_tavily_tool",
-    "create_tavily_tool",
-    "TAVILY_FREE_TIER_MONTHLY_LIMIT",
-    # OpenRouter search
+    # OpenRouter search (preferred - native search, no extra cost)
     "OpenRouterSearchTool",
     "OpenRouterClient",
     "get_openrouter_search_tool",
     "create_openrouter_search_tool",
-    "OPENROUTER_SEARCH_COST_USD",
+    "OPENROUTER_EXA_COST_PER_RESULT_USD",
+    "OPENROUTER_NATIVE_COST_USD",
+    "SEARCH_ENGINE_NATIVE",
+    "SEARCH_ENGINE_EXA",
+    "NATIVE_SEARCH_MODELS",
+    # Tavily search (fallback)
+    "TavilySearchTool",
+    "get_tavily_tool",
+    "create_tavily_tool",
+    "TAVILY_FREE_TIER_MONTHLY_LIMIT",
     # RAG retriever
     "RAGRetriever",
     "Document",

@@ -37,11 +37,14 @@ pydantic>=2.10.0
 pydantic-settings>=2.6.0
 
 # -----------------------------------------------------------------------------
-# HTTP Clients & Search
+# HTTP Clients & Web Search
 # -----------------------------------------------------------------------------
 httpx>=0.28.0
-tavily-python>=0.5.0
 tenacity>=9.0.0
+
+# Tavily (optional fallback - native OpenRouter search is primary)
+# Only needed if TAVILY_ENABLED=true
+tavily-python>=0.5.0
 
 # -----------------------------------------------------------------------------
 # Observability - Phoenix & OpenTelemetry

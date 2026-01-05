@@ -234,12 +234,51 @@ class Settings(BaseSettings):
     )
 
     # =========================================================================
-    # Tavily Search Settings
+    # Web Search Settings (OpenRouter Native - Primary)
     # =========================================================================
+
+    SEARCH_ENGINE: Literal["native", "exa", "auto"] = Field(
+        default="native",
+        description=(
+            "Web search engine: 'native' (Anthropic/OpenAI/Perplexity/xAI - no extra cost), "
+            "'exa' ($0.004/result), or 'auto' (let OpenRouter decide)"
+        ),
+    )
+
+    SEARCH_MODEL: str = Field(
+        default="openai/gpt-4o-mini",
+        description=(
+            "Model for web search. For native search, use models from "
+            "Anthropic, OpenAI, Perplexity, or xAI."
+        ),
+    )
+
+    SEARCH_MAX_RESULTS: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum results per search query",
+    )
+
+    SEARCH_TIMEOUT: float = Field(
+        default=60.0,
+        ge=10.0,
+        le=300.0,
+        description="Search request timeout in seconds",
+    )
+
+    # =========================================================================
+    # Tavily Search Settings (Fallback - Optional)
+    # =========================================================================
+
+    TAVILY_ENABLED: bool = Field(
+        default=False,
+        description="Enable Tavily as fallback search (requires API key)",
+    )
 
     TAVILY_API_KEY: SecretStr = Field(
         default=SecretStr(""),
-        description="Tavily search API key",
+        description="Tavily search API key (optional, for fallback)",
     )
 
     TAVILY_SEARCH_DEPTH: Literal["basic", "advanced"] = Field(
@@ -626,8 +665,9 @@ def validate_required_settings() -> list[str]:
         if not settings.openrouter_api_key_value:
             errors.append("OPENROUTER_API_KEY is required in production")
 
-        if not settings.tavily_api_key_value:
-            errors.append("TAVILY_API_KEY is required in production")
+        # Tavily is optional - only validate if enabled
+        if settings.TAVILY_ENABLED and not settings.tavily_api_key_value:
+            errors.append("TAVILY_API_KEY is required when TAVILY_ENABLED=true")
 
         if settings.secret_key_value == "change-me-in-production-use-secure-random-key":
             errors.append("SECRET_KEY must be changed in production")

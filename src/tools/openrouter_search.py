@@ -1,14 +1,18 @@
 """
 OpenRouter Web Search Tool for DRX Deep Research system.
 
-Provides web search capabilities using OpenRouter's web search plugin
-(Exa-powered). Extracts citations from model responses with annotations.
+Provides web search capabilities using OpenRouter's native web search plugin.
+Native search is available for Anthropic, OpenAI, Perplexity, and xAI models,
+providing direct search integration without additional third-party costs.
 
 Features:
-- Web search via OpenRouter chat completion with :online plugin
-- Citation extraction from annotations
-- Cost tracking ($0.02 per search)
+- Native web search via OpenRouter chat completion with :online plugin
+- Citation extraction from annotations (url_citation format)
+- Support for native engine (preferred) and exa fallback
 - Response parsing into standardized SearchResult format
+- Cost tracking based on provider pass-through pricing
+
+Reference: https://openrouter.ai/docs/guides/features/plugins/web-search
 """
 
 from __future__ import annotations
@@ -31,29 +35,62 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
-# OpenRouter web search costs ~$0.02 per search
-OPENROUTER_SEARCH_COST_USD = 0.02
+# OpenRouter web search pricing:
+# - Native: Provider pass-through based on search context (low/medium/high)
+# - Exa: $4 per 1000 results (~$0.02 per request with 5 results)
+# Native search has no additional per-search cost beyond token usage
+OPENROUTER_EXA_COST_PER_RESULT_USD = 0.004  # $4/1000 results
+OPENROUTER_NATIVE_COST_USD = 0.0  # Included in token cost
 OPENROUTER_RATE_LIMIT_PER_SECOND = 10.0
+
+# Search engine options
+SEARCH_ENGINE_NATIVE = "native"  # For Anthropic, OpenAI, Perplexity, xAI
+SEARCH_ENGINE_EXA = "exa"  # For other models
+SEARCH_ENGINE_AUTO = None  # Let OpenRouter decide
+
+# Models that support native search (no Exa fallback needed)
+NATIVE_SEARCH_MODELS = {
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3-opus",
+    "anthropic/claude-3-haiku",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "openai/gpt-4-turbo",
+    "openai/o1",
+    "openai/o1-mini",
+    "perplexity/llama-3.1-sonar-small-128k-online",
+    "perplexity/llama-3.1-sonar-large-128k-online",
+    "perplexity/llama-3.1-sonar-huge-128k-online",
+    "x-ai/grok-2",
+    "x-ai/grok-beta",
+}
 
 
 class OpenRouterSearchTool(SearchTool):
     """
     OpenRouter Web Search integration for DRX.
 
-    Uses OpenRouter's web search plugin (Exa-powered) to search the web
-    and extract citations from model responses.
+    Uses OpenRouter's native web search plugin for supported models
+    (Anthropic, OpenAI, Perplexity, xAI), with Exa fallback for others.
+
+    Native search advantages:
+    - No additional per-search cost (included in token pricing)
+    - Direct integration with provider's search capabilities
+    - Better accuracy for supported models
 
     Features:
+    - Native search engine (preferred) with Exa fallback
     - Async search via chat completion with :online suffix
-    - Citation extraction from annotations
-    - Cost tracking
-    - Support for various models
+    - Citation extraction from annotations (url_citation format)
+    - Cost tracking with engine-aware pricing
+    - Support for custom search prompts
     """
 
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "google/gemini-2.0-flash-001",
+        model: str = "openai/gpt-4o-mini",  # Default to native-capable model
+        engine: str | None = SEARCH_ENGINE_NATIVE,  # Prefer native search
         rate_limiter: RateLimiter | None = None,
         timeout: float = 60.0,
         default_max_results: int = 5,
@@ -64,7 +101,10 @@ class OpenRouterSearchTool(SearchTool):
 
         Args:
             api_key: OpenRouter API key (defaults to OPENROUTER_API_KEY env var)
-            model: Model to use for search (must support :online plugin)
+            model: Model to use for search. For native search, use models from
+                   Anthropic, OpenAI, Perplexity, or xAI.
+            engine: Search engine - "native" (preferred), "exa", or None (auto).
+                    Native search has no additional cost beyond tokens.
             rate_limiter: Custom rate limiter
             timeout: Request timeout in seconds
             default_max_results: Default number of results to return
@@ -90,9 +130,12 @@ class OpenRouterSearchTool(SearchTool):
             )
 
         self._model = model
+        self._engine = engine
         self._track_costs = track_costs
         self._total_cost_usd = 0.0
         self._search_count = 0
+        self._native_search_count = 0
+        self._exa_search_count = 0
 
         # HTTP client
         self._client: httpx.AsyncClient | None = None
@@ -100,16 +143,39 @@ class OpenRouterSearchTool(SearchTool):
         # OpenRouter API base URL
         self._base_url = "https://openrouter.ai/api/v1"
 
+        # Log engine selection
+        if engine == SEARCH_ENGINE_NATIVE:
+            if self._is_native_supported(model):
+                logger.info(f"Using native search with model: {model}")
+            else:
+                logger.warning(
+                    f"Model {model} may not support native search. "
+                    f"Consider using: {', '.join(list(NATIVE_SEARCH_MODELS)[:3])}"
+                )
+
+    def _is_native_supported(self, model: str) -> bool:
+        """Check if model supports native search."""
+        # Check exact match or prefix match for model families
+        base_model = model.split(":")[0]  # Remove :online suffix if present
+        if base_model in NATIVE_SEARCH_MODELS:
+            return True
+        # Check prefix for model families
+        for native_model in NATIVE_SEARCH_MODELS:
+            if base_model.startswith(native_model.rsplit("-", 1)[0]):
+                return True
+        return False
+
     @property
     def name(self) -> str:
         return "openrouter_search"
 
     @property
     def description(self) -> str:
+        engine_desc = "native" if self._engine == SEARCH_ENGINE_NATIVE else "web"
         return (
-            "Search the web using OpenRouter's Exa-powered search plugin. "
+            f"Search the web using OpenRouter's {engine_desc} search plugin. "
             "Returns web results with citations extracted from AI-processed "
-            "search results. Best for comprehensive research queries."
+            "search results. Native search has no additional per-search cost."
         )
 
     @property
@@ -163,7 +229,7 @@ class OpenRouterSearchTool(SearchTool):
         Args:
             query: Search query
             max_results: Maximum results to return
-            **kwargs: Additional parameters
+            **kwargs: Additional parameters (search_prompt, engine override)
 
         Returns:
             List of SearchResult objects
@@ -178,6 +244,21 @@ class OpenRouterSearchTool(SearchTool):
         # Use :online suffix for web search plugin
         model_with_search = f"{self._model}:online"
 
+        # Build plugin configuration with engine preference
+        plugin_config: dict[str, Any] = {
+            "id": "web",
+            "max_results": max_results
+        }
+
+        # Set engine - prefer native for supported models
+        engine = kwargs.get("engine", self._engine)
+        if engine is not None:
+            plugin_config["engine"] = engine
+
+        # Add custom search prompt if provided
+        if "search_prompt" in kwargs:
+            plugin_config["search_prompt"] = kwargs["search_prompt"]
+
         # Build request payload
         payload = {
             "model": model_with_search,
@@ -188,15 +269,10 @@ class OpenRouterSearchTool(SearchTool):
                 }
             ],
             "max_tokens": 2048,
-            "plugins": [
-                {
-                    "id": "web",
-                    "max_results": max_results
-                }
-            ]
+            "plugins": [plugin_config]
         }
 
-        logger.debug(f"OpenRouter search request: {payload}")
+        logger.debug(f"OpenRouter search request: model={model_with_search}, engine={engine}")
 
         # Execute request
         response = await client.post("/chat/completions", json=payload)
@@ -204,10 +280,19 @@ class OpenRouterSearchTool(SearchTool):
 
         data = response.json()
 
-        # Track costs
+        # Track costs based on engine used
         if self._track_costs:
             self._search_count += 1
-            self._total_cost_usd += OPENROUTER_SEARCH_COST_USD
+            # Determine actual engine used (check response or assume based on model)
+            used_native = engine == SEARCH_ENGINE_NATIVE or (
+                engine is None and self._is_native_supported(self._model)
+            )
+            if used_native:
+                self._native_search_count += 1
+                # Native search cost is included in token pricing
+            else:
+                self._exa_search_count += 1
+                self._total_cost_usd += OPENROUTER_EXA_COST_PER_RESULT_USD * max_results
 
         # Parse response and extract citations
         return self._parse_response(data, query)
@@ -272,6 +357,18 @@ Format each result clearly."""
         """
         Parse OpenRouter annotations into SearchResults.
 
+        Handles the url_citation format from OpenRouter's native search:
+        {
+            "type": "url_citation",
+            "url_citation": {
+                "url": "https://...",
+                "title": "...",
+                "content": "...",
+                "start_index": 100,
+                "end_index": 200
+            }
+        }
+
         Args:
             annotations: List of annotation objects from response
             query: Original query
@@ -288,10 +385,19 @@ Format each result clearly."""
             title = ""
             snippet = ""
 
+            # Native search url_citation format (nested structure)
             if annotation.get("type") == "url_citation":
-                url = annotation.get("url", "")
-                title = annotation.get("title", annotation.get("text", ""))
-                snippet = annotation.get("snippet", "")
+                citation = annotation.get("url_citation", {})
+                if isinstance(citation, dict):
+                    url = citation.get("url", "")
+                    title = citation.get("title", "")
+                    snippet = citation.get("content", "")
+                else:
+                    # Fallback for flat structure
+                    url = annotation.get("url", "")
+                    title = annotation.get("title", annotation.get("text", ""))
+                    snippet = annotation.get("content", annotation.get("snippet", ""))
+            # Exa/other format with direct url field
             elif "url" in annotation:
                 url = annotation.get("url", "")
                 title = annotation.get("title", "")
@@ -312,6 +418,7 @@ Format each result clearly."""
                 score=score,
                 metadata={
                     "source": "openrouter",
+                    "engine": self._engine or "auto",
                     "query": query,
                     "rank": idx + 1,
                     "model": self._model,
@@ -422,7 +529,8 @@ Format each result clearly."""
         self,
         query: str,
         system_prompt: str,
-        max_results: int | None = None
+        max_results: int | None = None,
+        engine: str | None = None
     ) -> list[SearchResult]:
         """
         Execute search with a custom system prompt.
@@ -433,6 +541,7 @@ Format each result clearly."""
             query: Search query
             system_prompt: Custom system prompt
             max_results: Maximum results
+            engine: Search engine override ("native", "exa", or None for auto)
 
         Returns:
             List of SearchResult objects
@@ -442,6 +551,15 @@ Format each result clearly."""
 
         model_with_search = f"{self._model}:online"
 
+        # Build plugin config with engine preference
+        plugin_config: dict[str, Any] = {
+            "id": "web",
+            "max_results": max_results
+        }
+        effective_engine = engine if engine is not None else self._engine
+        if effective_engine is not None:
+            plugin_config["engine"] = effective_engine
+
         payload = {
             "model": model_with_search,
             "messages": [
@@ -449,7 +567,7 @@ Format each result clearly."""
                 {"role": "user", "content": query}
             ],
             "max_tokens": 2048,
-            "plugins": [{"id": "web", "max_results": max_results}]
+            "plugins": [plugin_config]
         }
 
         response = await client.post("/chat/completions", json=payload)
@@ -457,9 +575,17 @@ Format each result clearly."""
 
         data = response.json()
 
+        # Track costs based on engine
         if self._track_costs:
             self._search_count += 1
-            self._total_cost_usd += OPENROUTER_SEARCH_COST_USD
+            used_native = effective_engine == SEARCH_ENGINE_NATIVE or (
+                effective_engine is None and self._is_native_supported(self._model)
+            )
+            if used_native:
+                self._native_search_count += 1
+            else:
+                self._exa_search_count += 1
+                self._total_cost_usd += OPENROUTER_EXA_COST_PER_RESULT_USD * max_results
 
         return self._parse_response(data, query)
 
@@ -467,8 +593,12 @@ Format each result clearly."""
         """Get cost tracking statistics."""
         return {
             "search_count": self._search_count,
+            "native_search_count": self._native_search_count,
+            "exa_search_count": self._exa_search_count,
             "total_cost_usd": round(self._total_cost_usd, 4),
-            "cost_per_search_usd": OPENROUTER_SEARCH_COST_USD
+            "engine": self._engine or "auto",
+            "model": self._model,
+            "note": "Native search cost is included in token pricing"
         }
 
     async def close(self):

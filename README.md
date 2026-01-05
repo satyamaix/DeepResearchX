@@ -280,8 +280,14 @@ OPENROUTER_API_KEY=sk-or-v1-...        # LLM API access
 DATABASE_URL=postgresql://...           # PostgreSQL connection
 REDIS_URL=redis://localhost:6379       # Redis connection
 
-# Optional - Search
-TAVILY_API_KEY=tvly-...                # Web search API
+# Web Search (Native - No Extra Cost)
+SEARCH_ENGINE=native                   # native, exa, or auto
+SEARCH_MODEL=openai/gpt-4o-mini        # Must support native search
+SEARCH_MAX_RESULTS=5                   # Results per query
+
+# Optional - Tavily Fallback
+TAVILY_ENABLED=false                   # Enable Tavily as fallback
+TAVILY_API_KEY=tvly-...                # Required if TAVILY_ENABLED=true
 
 # Optional - Observability
 PHOENIX_COLLECTOR_ENDPOINT=http://localhost:4317
@@ -296,6 +302,19 @@ MAX_ITERATIONS=5                       # Max research cycles
 TOKEN_BUDGET=100000                    # Max tokens per session
 DEFAULT_RATE_LIMIT_RPM=60             # Requests per minute
 ```
+
+### Native Web Search
+
+DRX uses OpenRouter's **native web search** by default, which has no additional per-search cost (included in token pricing). Native search is available for:
+
+| Provider | Models |
+|----------|--------|
+| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o1-mini |
+| **Anthropic** | claude-3.5-sonnet, claude-3-opus, claude-3-haiku |
+| **Perplexity** | llama-3.1-sonar-* (online variants) |
+| **xAI** | grok-2, grok-beta |
+
+For other models, Exa search is used automatically ($0.004/result).
 
 ### Agent Manifest
 
