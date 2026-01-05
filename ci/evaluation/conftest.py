@@ -691,6 +691,303 @@ async def cleanup_after_test() -> AsyncGenerator[None, None]:
 
 
 # =============================================================================
+# Shared Mock Classes
+# =============================================================================
+
+
+class MockRateLimits:
+    """Mock rate limits object for testing."""
+
+    def __init__(
+        self,
+        requests_per_minute: int = 60,
+        tokens_per_minute: int = 100000,
+    ) -> None:
+        self.requests_per_minute = requests_per_minute
+        self.tokens_per_minute = tokens_per_minute
+
+
+class MockCircuitBreakerConfig:
+    """Mock circuit breaker configuration for testing."""
+
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        success_threshold: int = 3,
+        timeout_seconds: int = 30,
+    ) -> None:
+        self.failure_threshold = failure_threshold
+        self.success_threshold = success_threshold
+        self.timeout_seconds = timeout_seconds
+
+
+class MockManifest:
+    """
+    Mock AgentManifest for testing compliance assertions and circuit breaker.
+
+    This consolidated mock supports both metadata compliance testing
+    (test_metadata_compliance.py) and circuit breaker testing
+    (test_circuit_breaker.py).
+    """
+
+    def __init__(
+        self,
+        agent_id: str = "test_agent_v1",
+        agent_type: str = "searcher",
+        capabilities: list[str] | None = None,
+        allowed_domains: list[str] | None = None,
+        blocked_domains: list[str] | None = None,
+        max_budget_usd: float = 1.0,
+        rate_limits: MockRateLimits | None = None,
+        circuit_breaker: MockCircuitBreakerConfig | None = None,
+        allowed_tools: list[str] | None = None,
+        is_active: bool = True,
+    ) -> None:
+        self.id = agent_id
+        self.agent_type = agent_type
+        self.capabilities = capabilities or ["web_search", "source_discovery"]
+        self.allowed_domains = allowed_domains or []
+        self.blocked_domains = blocked_domains or []
+        self.max_budget_usd = max_budget_usd
+        self.rate_limits = rate_limits or MockRateLimits()
+        self.circuit_breaker = circuit_breaker or MockCircuitBreakerConfig()
+        self.allowed_tools = allowed_tools or ["web_search", "url_fetch"]
+        self.is_active = is_active
+
+
+class MockRedisClient:
+    """
+    Mock Redis client for testing.
+
+    Provides full hash operation support for circuit breaker state management
+    and general key-value operations for caching.
+    """
+
+    def __init__(self) -> None:
+        self._data: dict[str, str] = {}
+        self._hash_data: dict[str, dict[str, str]] = {}
+
+    async def get(self, key: str) -> str | None:
+        return self._data.get(key)
+
+    async def set(self, key: str, value: str, **kwargs: Any) -> bool:
+        self._data[key] = value
+        return True
+
+    async def delete(self, key: str) -> int:
+        if key in self._data:
+            del self._data[key]
+            return 1
+        return 0
+
+    async def hget(self, key: str, field: str) -> str | None:
+        if key in self._hash_data:
+            return self._hash_data[key].get(field)
+        return None
+
+    async def hset(self, key: str, mapping: dict[str, str] | None = None, **kwargs: Any) -> int:
+        if key not in self._hash_data:
+            self._hash_data[key] = {}
+        if mapping:
+            self._hash_data[key].update(mapping)
+        return len(mapping) if mapping else 0
+
+    async def hdel(self, key: str, *fields: str) -> int:
+        count = 0
+        if key in self._hash_data:
+            for field in fields:
+                if field in self._hash_data[key]:
+                    del self._hash_data[key][field]
+                    count += 1
+        return count
+
+    async def hgetall(self, key: str) -> dict[str, str]:
+        return self._hash_data.get(key, {})
+
+    async def hincrby(self, key: str, field: str, amount: int = 1) -> int:
+        if key not in self._hash_data:
+            self._hash_data[key] = {}
+        current = int(self._hash_data[key].get(field, "0"))
+        new_value = current + amount
+        self._hash_data[key][field] = str(new_value)
+        return new_value
+
+    async def incrbyfloat(self, key: str, amount: float) -> float:
+        current = float(self._data.get(key, "0"))
+        new_value = current + amount
+        self._data[key] = str(new_value)
+        return new_value
+
+    async def expire(self, key: str, seconds: int) -> bool:
+        return True
+
+    async def incr(self, key: str) -> int:
+        current = int(self._data.get(key, "0"))
+        new_value = current + 1
+        self._data[key] = str(new_value)
+        return new_value
+
+    async def ping(self) -> bool:
+        return True
+
+    def pipeline(self, transaction: bool = True) -> "MockRedisPipeline":
+        return MockRedisPipeline(self)
+
+
+class MockRedisPipeline:
+    """Mock Redis pipeline for atomic operations."""
+
+    def __init__(self, client: MockRedisClient) -> None:
+        self._client = client
+        self._commands: list[tuple[str, tuple, dict]] = []
+
+    async def __aenter__(self) -> "MockRedisPipeline":
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        pass
+
+    async def set(self, key: str, value: str, **kwargs: Any) -> "MockRedisPipeline":
+        self._commands.append(("set", (key, value), kwargs))
+        return self
+
+    async def delete(self, key: str) -> "MockRedisPipeline":
+        self._commands.append(("delete", (key,), {}))
+        return self
+
+    async def hset(self, key: str, mapping: dict[str, str] | None = None, **kwargs: Any) -> "MockRedisPipeline":
+        self._commands.append(("hset", (key, mapping), kwargs))
+        return self
+
+    async def hdel(self, key: str, *fields: str) -> "MockRedisPipeline":
+        self._commands.append(("hdel", (key, *fields), {}))
+        return self
+
+    async def hincrby(self, key: str, field: str, amount: int = 1) -> "MockRedisPipeline":
+        self._commands.append(("hincrby", (key, field, amount), {}))
+        return self
+
+    async def expire(self, key: str, seconds: int) -> "MockRedisPipeline":
+        self._commands.append(("expire", (key, seconds), {}))
+        return self
+
+    async def execute(self) -> list[Any]:
+        results = []
+        for cmd, args, kwargs in self._commands:
+            if cmd == "set":
+                await self._client.set(args[0], args[1], **kwargs)
+                results.append(True)
+            elif cmd == "delete":
+                result = await self._client.delete(args[0])
+                results.append(result)
+            elif cmd == "hset":
+                result = await self._client.hset(args[0], args[1], **kwargs)
+                results.append(result)
+            elif cmd == "hdel":
+                result = await self._client.hdel(args[0], *args[1:])
+                results.append(result)
+            elif cmd == "hincrby":
+                result = await self._client.hincrby(args[0], args[1], args[2])
+                results.append(result)
+            elif cmd == "expire":
+                results.append(True)
+            else:
+                results.append(None)
+        self._commands.clear()
+        return results
+
+
+class MockActiveStateService:
+    """
+    Mock ActiveStateService for circuit breaker and policy firewall testing.
+
+    Provides in-memory state management for agent circuit status and
+    failure/success counting.
+    """
+
+    def __init__(self, redis_client: MockRedisClient | None = None) -> None:
+        import time
+        self._time = time
+        self.redis = redis_client or MockRedisClient()
+        self._initialized = True
+        self._circuit_states: dict[str, str] = {}  # "closed", "open", "half_open"
+        self._failure_counts: dict[str, int] = {}
+
+    async def initialize(self) -> None:
+        self._initialized = True
+
+    async def get_circuit_status(self, agent_id: str) -> str:
+        return self._circuit_states.get(agent_id, "closed")
+
+    async def set_circuit_status(self, agent_id: str, status: str) -> None:
+        self._circuit_states[agent_id] = status
+        await self.redis.set(f"drx:agent:{agent_id}:circuit", status)
+
+        if status == "open":
+            await self.redis.set(
+                f"drx:agent:{agent_id}:circuit_opened_at",
+                str(self._time.time()),
+            )
+
+    async def increment_failure_count(self, agent_id: str) -> int:
+        self._failure_counts[agent_id] = self._failure_counts.get(agent_id, 0) + 1
+        return self._failure_counts[agent_id]
+
+    async def reset_failure_count(self, agent_id: str) -> None:
+        self._failure_counts[agent_id] = 0
+        await self.redis.hdel(f"drx:agent:{agent_id}:health", "failure_count")
+
+    async def get_all_agent_ids(self) -> list[str]:
+        return list(self._circuit_states.keys())
+
+    def _circuit_opened_at_key(self, agent_id: str) -> str:
+        return f"drx:agent:{agent_id}:circuit_opened_at"
+
+
+# =============================================================================
+# Shared Mock Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def mock_manifest() -> MockManifest:
+    """
+    Return a default MockManifest for testing.
+
+    Provides a standard agent manifest with common defaults suitable
+    for most test scenarios.
+    """
+    return MockManifest(
+        agent_id="test_agent_v1",
+        agent_type="searcher",
+        capabilities=["web_search", "source_discovery"],
+        max_budget_usd=5.0,
+    )
+
+
+@pytest.fixture
+def mock_redis_client() -> MockRedisClient:
+    """
+    Return a MockRedisClient for testing.
+
+    Provides full Redis operation support including hash operations
+    for circuit breaker state management.
+    """
+    return MockRedisClient()
+
+
+@pytest.fixture
+def mock_active_state_service(mock_redis_client: MockRedisClient) -> MockActiveStateService:
+    """
+    Return a MockActiveStateService for testing.
+
+    Provides in-memory agent state management for circuit breaker
+    and policy firewall testing.
+    """
+    return MockActiveStateService(mock_redis_client)
+
+
+# =============================================================================
 # Marker-based Skipping
 # =============================================================================
 

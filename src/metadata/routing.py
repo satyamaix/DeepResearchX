@@ -21,7 +21,7 @@ Integration Points:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
     from src.services.active_state import ActiveStateService

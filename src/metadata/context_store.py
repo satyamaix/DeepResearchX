@@ -939,8 +939,6 @@ class PostgresContextStore(ContextStore):
         self._ensure_initialized()
 
         try:
-            from datetime import timedelta
-
             query = """
                 UPDATE research_contexts
                 SET

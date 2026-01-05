@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -710,26 +712,23 @@ class EventRecorder:
             logger.error(f"Failed to get session summary: {e}")
             raise RecorderError(f"Failed to get session summary: {e}") from e
 
-    async def _get_connection(self) -> Any:
+    @asynccontextmanager
+    async def _get_connection(self) -> AsyncIterator[AsyncConnection[dict[str, Any]]]:
         """Get a database connection.
 
         Returns the injected connection if available, otherwise
         acquires one from the pool.
 
-        Returns:
-            Async context manager for database connection.
+        Yields:
+            AsyncConnection: Database connection for executing queries.
         """
         if self._conn is not None:
-            # Return a no-op context manager for the injected connection
-            from contextlib import asynccontextmanager
-
-            @asynccontextmanager
-            async def _noop_cm():
-                yield self._conn
-
-            return _noop_cm()
-
-        return get_async_connection()
+            # Use the injected connection directly (no cleanup needed)
+            yield self._conn
+        else:
+            # Acquire from pool and ensure proper cleanup
+            async with get_async_connection() as conn:
+                yield conn
 
 
 # =============================================================================

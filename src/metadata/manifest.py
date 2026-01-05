@@ -13,10 +13,11 @@ Part of the Agentic Metadata implementation (R10.8 from DRX.md spec).
 from __future__ import annotations
 
 import re
-from datetime import datetime
 from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from src.metadata.circuit_breaker import CircuitBreakerConfigDict
 
 
 # =============================================================================
@@ -58,12 +59,9 @@ class HealthThresholdsDict(TypedDict, total=False):
     min_success_rate: float
 
 
-class CircuitBreakerDict(TypedDict, total=False):
-    """Circuit breaker configuration as TypedDict."""
-
-    failure_threshold: int
-    success_threshold: int
-    timeout_seconds: int
+# CircuitBreakerDict is an alias to the canonical CircuitBreakerConfigDict
+# from circuit_breaker.py for backward compatibility
+CircuitBreakerDict = CircuitBreakerConfigDict
 
 
 class ModelConfigDict(TypedDict, total=False):
@@ -177,6 +175,10 @@ class CircuitBreakerConfig(BaseModel):
 
     Implements the circuit breaker pattern to prevent cascading
     failures when an agent or its dependencies are unhealthy.
+
+    Note: This Pydantic model corresponds to CircuitBreakerConfigDict TypedDict.
+    Default values are aligned with DEFAULT_CIRCUIT_BREAKER_CONFIG in
+    src.metadata.circuit_breaker.
     """
 
     failure_threshold: int = Field(
@@ -192,10 +194,22 @@ class CircuitBreakerConfig(BaseModel):
         description="Number of successes in half-open state before closing",
     )
     timeout_seconds: int = Field(
-        default=60,
+        default=30,
         ge=1,
         le=3600,
         description="Seconds to wait before attempting recovery",
+    )
+    half_open_max_calls: int = Field(
+        default=3,
+        ge=1,
+        le=100,
+        description="Maximum calls allowed in half-open state",
+    )
+    error_rate_threshold: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Error rate threshold (0.0-1.0) to trigger circuit open",
     )
 
     model_config = {"extra": "forbid"}
@@ -451,6 +465,8 @@ class AgentManifest(BaseModel):
                 failure_threshold=self.circuit_breaker.failure_threshold,
                 success_threshold=self.circuit_breaker.success_threshold,
                 timeout_seconds=self.circuit_breaker.timeout_seconds,
+                half_open_max_calls=self.circuit_breaker.half_open_max_calls,
+                error_rate_threshold=self.circuit_breaker.error_rate_threshold,
             ),
             model_config=ModelConfigDict(
                 model=self.model_config_params.model,

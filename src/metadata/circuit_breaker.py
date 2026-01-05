@@ -58,21 +58,28 @@ class CircuitState(str, Enum):
 class CircuitBreakerConfigDict(TypedDict, total=False):
     """Configuration for circuit breaker behavior.
 
+    This is the canonical circuit breaker configuration TypedDict used across
+    the entire DRX codebase. Import this from src.metadata.circuit_breaker
+    instead of defining locally.
+
     Attributes:
         failure_threshold: Number of consecutive failures before opening circuit.
                           Default: 5
         success_threshold: Number of consecutive successes in half-open state
                           before closing circuit. Default: 3
         timeout_seconds: Time to wait in open state before attempting recovery.
-                        Default: 30
+                        Default: 30 seconds (standard across all components)
         half_open_max_calls: Maximum number of calls allowed in half-open state.
                             Default: 3
+        error_rate_threshold: Error rate threshold (0.0-1.0) that can trigger
+                             circuit open. Default: 0.5
     """
 
     failure_threshold: int
     success_threshold: int
     timeout_seconds: int
     half_open_max_calls: int
+    error_rate_threshold: float
 
 
 class CircuitStatsDict(TypedDict):
@@ -135,6 +142,7 @@ DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfigDict = {
     "success_threshold": 3,
     "timeout_seconds": 30,
     "half_open_max_calls": 3,
+    "error_rate_threshold": 0.5,
 }
 
 
@@ -466,8 +474,7 @@ class CircuitBreaker:
             agent_id: The agent identifier
             state: The new circuit state
         """
-        state_value: Literal["closed", "open", "half_open"] = state.value  # type: ignore
-        await self.active_state.set_circuit_status(agent_id, state_value)
+        await self.active_state.set_circuit_status(agent_id, state.value)
 
     async def get_state(self, agent_id: str) -> CircuitState:
         """Get the current circuit state for an agent.

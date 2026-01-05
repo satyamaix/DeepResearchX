@@ -31,7 +31,7 @@ Usage:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 
 # =============================================================================
@@ -498,8 +498,9 @@ def extract_domains_accessed(trace: Trace) -> set[str]:
 
     for agent_inv in trace.get("agent_invocations", []):
         for tool_inv in agent_inv.get("tool_invocations", []):
-            if tool_inv.get("domain"):
-                domains.add(tool_inv["domain"])
+            domain = tool_inv.get("domain")
+            if domain:
+                domains.add(domain)
 
     return domains
 
@@ -520,8 +521,9 @@ def extract_urls_accessed(trace: Trace) -> list[str]:
 
     for agent_inv in trace.get("agent_invocations", []):
         for tool_inv in agent_inv.get("tool_invocations", []):
-            if tool_inv.get("url"):
-                urls.append(tool_inv["url"])
+            url = tool_inv.get("url")
+            if url:
+                urls.append(url)
 
     return urls
 
@@ -881,7 +883,7 @@ def assert_rate_limit_compliance(
         raise RateLimitComplianceError(
             message=f"Rate limit violation recorded: {limit_type}",
             agent_id=agent_id,
-            limit_type=limit_type,  # type: ignore
+            limit_type=cast(Literal["requests", "tokens"], limit_type),
             current_value=current,
             limit_value=limit,
         )

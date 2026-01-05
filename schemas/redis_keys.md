@@ -672,7 +672,214 @@ async def is_circuit_open(r: redis.Redis, agent_id: str) -> bool:
 
 ---
 
-## 11. Active State Service (Agentic Metadata - R10.3)
+## 11. Context Store (WP-M3 Context Propagation)
+
+The Context Store provides storage for ResearchContext objects used in context propagation between agents and iterations. Supports Redis for active contexts with TTL and PostgreSQL for persistent storage.
+
+### Key Namespace
+
+All Context Store keys use the `drx:context:` prefix:
+
+```
+drx:context:{resource}:{identifier}
+```
+
+### Context Data
+
+Stores the serialized ResearchContext object.
+
+```
+Key:     drx:context:ctx:{context_id}
+Type:    STRING (JSON)
+TTL:     Configurable (default 3600 seconds)
+```
+
+**Structure:**
+```json
+{
+  "context_id": "ctx-550e8400-e29b-41d4-a716-446655440000",
+  "session_id": "session-123",
+  "summary": "Compressed context summary for propagation",
+  "key_entities": ["entity1", "entity2"],
+  "relevance_vector": [0.1, 0.2, ...],
+  "chunk_refs": ["chunk-1", "chunk-2"],
+  "created_at": "2024-01-01T00:00:00Z",
+  "ttl_seconds": 3600
+}
+```
+
+**Example:**
+```redis
+SETEX drx:context:ctx:ctx-550e8400 3600 '{"context_id":"ctx-550e8400","session_id":"session-123",...}'
+GET drx:context:ctx:ctx-550e8400
+```
+
+### Context Metadata
+
+Stores optional metadata for a research context.
+
+```
+Key:     drx:context:meta:{context_id}
+Type:    HASH
+TTL:     Same as associated context
+```
+
+**Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `source_agent` | string | Agent that created this context |
+| `iteration_number` | int | Iteration number in research cycle |
+| `parent_context_id` | string | Parent context for lineage tracking |
+| `compression_ratio` | float | Ratio of compression applied |
+| `original_token_count` | int | Token count before compression |
+| `compressed_token_count` | int | Token count after compression |
+| `status` | string | Context status (active, expired, archived) |
+| `updated_at` | timestamp | Last update timestamp |
+
+**Example:**
+```redis
+HSET drx:context:meta:ctx-550e8400 \
+    source_agent "planner" \
+    iteration_number 2 \
+    compression_ratio 0.35 \
+    status "active"
+```
+
+### Session Context Index
+
+Sorted set tracking all contexts for a session, ordered by creation time.
+
+```
+Key:     drx:context:session:{session_id}
+Type:    SORTED SET
+Score:   Unix timestamp of context creation
+TTL:     Extended to match longest context TTL
+```
+
+**Example:**
+```redis
+ZADD drx:context:session:session-123 1704067200 "ctx-550e8400"
+ZREVRANGE drx:context:session:session-123 0 9  # Get 10 most recent contexts
+```
+
+---
+
+## 12. Policy Firewall (WP-M6 Metadata Firewall)
+
+The Policy Firewall provides policy enforcement for tool invocations including budget tracking, rate limiting, and violation event streaming.
+
+### Key Namespace
+
+Policy Firewall keys use the `drx:policy:` and `drx:events:` prefixes:
+
+```
+drx:policy:{policy_type}:{agent_id}[:{session_id}]
+drx:events:{event_type}
+```
+
+### Budget Tracking
+
+Tracks spending per agent, optionally scoped to session.
+
+```
+Key:     drx:policy:budget:{agent_id}
+Type:    STRING (float)
+TTL:     None (application managed)
+Value:   Total spend in USD
+```
+
+**Session-Scoped Budget:**
+```
+Key:     drx:policy:budget:{agent_id}:{session_id}
+Type:    STRING (float)
+TTL:     24 hours (86400 seconds)
+Value:   Session spend in USD
+```
+
+**Example:**
+```redis
+# Record spend for agent
+INCRBYFLOAT drx:policy:budget:searcher_v1 0.0015
+
+# Record session-scoped spend
+INCRBYFLOAT drx:policy:budget:searcher_v1:session-123 0.0015
+EXPIRE drx:policy:budget:searcher_v1:session-123 86400
+
+# Get current spend
+GET drx:policy:budget:searcher_v1
+```
+
+### Rate Limit Counters
+
+Tracks request and token counts per agent for rate limiting.
+
+```
+Key:     drx:policy:ratelimit:{agent_id}
+Type:    HASH
+TTL:     60 seconds (sliding window)
+```
+
+**Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `requests_count` | int | Number of requests in current window |
+| `requests_limit` | int | Maximum requests per minute |
+| `tokens_count` | int | Number of tokens in current window |
+| `tokens_limit` | int | Maximum tokens per minute |
+| `window_start` | timestamp | ISO8601 timestamp of window start |
+
+**Example:**
+```redis
+HINCRBY drx:policy:ratelimit:searcher_v1 requests_count 1
+HINCRBY drx:policy:ratelimit:searcher_v1 tokens_count 1500
+HSET drx:policy:ratelimit:searcher_v1 window_start "2024-01-01T00:00:00Z"
+EXPIRE drx:policy:ratelimit:searcher_v1 60
+```
+
+### Policy Violation Event Stream
+
+Stream of policy violation events for real-time monitoring.
+
+```
+Key:     drx:events:policy_violations
+Type:    STREAM
+TTL:     None (MAXLEN trimmed to 10000 entries)
+```
+
+**Event Structure:**
+```json
+{
+  "event_type": "policy_violated",
+  "violation_id": "vio-550e8400-e29b-41d4-a716-446655440000",
+  "agent_id": "searcher_v1",
+  "violation_type": "budget_exceeded|rate_limited|domain_blocked|capability_denied",
+  "severity": "warning|error|critical",
+  "message": "Human-readable violation description",
+  "session_id": "session-123",
+  "timestamp": "2024-01-01T00:00:00Z"
+}
+```
+
+**Example:**
+```redis
+# Add violation event
+XADD drx:events:policy_violations MAXLEN ~ 10000 * \
+    event_type "policy_violated" \
+    violation_id "vio-550e8400" \
+    agent_id "searcher_v1" \
+    violation_type "budget_exceeded" \
+    severity "critical" \
+    message "Agent exceeded budget: $1.05 > $1.00" \
+    session_id "session-123" \
+    timestamp "2024-01-01T00:00:00Z"
+
+# Read recent violations
+XREVRANGE drx:events:policy_violations + - COUNT 10
+```
+
+---
+
+## 13. Active State Service (Agentic Metadata - R10.3)
 
 The Active State Service provides real-time agent health monitoring, metrics tracking, and circuit breaker state management. This implements the Agentic Metadata functionality from R10.3 of the DRX spec.
 

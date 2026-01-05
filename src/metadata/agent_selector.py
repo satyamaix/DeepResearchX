@@ -22,7 +22,7 @@ Integration Points:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from src.metadata.routing import (
     AgentCapabilityRouter,

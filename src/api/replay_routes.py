@@ -35,6 +35,7 @@ from src.api.dependencies import (
     rate_limit_heavy,
     rate_limit_standard,
 )
+from src.api.models import ErrorResponse
 from src.api.streaming import (
     StreamEvent,
     StreamEventType,
@@ -151,14 +152,6 @@ class SessionSummaryResponse(BaseModel):
     unique_nodes: int
     event_types: list[str]
     duration_ms: int
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response model."""
-
-    error: str
-    detail: str | None = None
-    code: str | None = None
 
 
 # =============================================================================
@@ -691,23 +684,23 @@ async def compare_sessions(
         )
 
         return CompareResponse(
-            original_session_id=diff_report["original_session_id"],
-            replay_session_id=diff_report["replay_session_id"],
-            total_events_original=diff_report["total_events_original"],
-            total_events_replay=diff_report["total_events_replay"],
-            matched_events=diff_report["matched_events"],
-            mismatched_events=diff_report["mismatched_events"],
-            missing_events=diff_report["missing_events"],
-            extra_events=diff_report["extra_events"],
-            summary=diff_report["summary"],
-            is_deterministic=diff_report["is_deterministic"],
-            determinism_score=diff_report["determinism_score"],
+            original_session_id=diff_report.get("original_session_id", ""),
+            replay_session_id=diff_report.get("replay_session_id", ""),
+            total_events_original=diff_report.get("total_events_original", 0),
+            total_events_replay=diff_report.get("total_events_replay", 0),
+            matched_events=diff_report.get("matched_events", 0),
+            mismatched_events=diff_report.get("mismatched_events", 0),
+            missing_events=diff_report.get("missing_events", 0),
+            extra_events=diff_report.get("extra_events", 0),
+            summary=diff_report.get("summary", ""),
+            is_deterministic=diff_report.get("is_deterministic", False),
+            determinism_score=diff_report.get("determinism_score", 0.0),
             event_diffs=(
-                [dict(d) for d in diff_report["event_diffs"]]
+                [dict(d) for d in diff_report.get("event_diffs", [])]
                 if request.include_field_diffs
                 else None
             ),
-            created_at=datetime.fromisoformat(diff_report["created_at"]),
+            created_at=datetime.fromisoformat(diff_report.get("created_at", datetime.now(timezone.utc).isoformat())),
         )
 
     except Exception as e:

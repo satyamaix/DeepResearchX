@@ -68,63 +68,12 @@ pytestmark = [
 ]
 
 
-# =============================================================================
-# Mock Manifest Fixture
-# =============================================================================
-
-
-class MockRateLimits:
-    """Mock rate limits object for testing."""
-
-    def __init__(
-        self,
-        requests_per_minute: int = 60,
-        tokens_per_minute: int = 100000,
-    ) -> None:
-        self.requests_per_minute = requests_per_minute
-        self.tokens_per_minute = tokens_per_minute
-
-
-class MockCircuitBreaker:
-    """Mock circuit breaker config for testing."""
-
-    def __init__(
-        self,
-        failure_threshold: int = 5,
-        success_threshold: int = 3,
-        timeout_seconds: int = 30,
-    ) -> None:
-        self.failure_threshold = failure_threshold
-        self.success_threshold = success_threshold
-        self.timeout_seconds = timeout_seconds
-
-
-class MockManifest:
-    """Mock AgentManifest for testing compliance assertions."""
-
-    def __init__(
-        self,
-        agent_id: str = "test_agent_v1",
-        agent_type: str = "searcher",
-        capabilities: list[str] | None = None,
-        allowed_domains: list[str] | None = None,
-        blocked_domains: list[str] | None = None,
-        max_budget_usd: float = 1.0,
-        rate_limits: MockRateLimits | None = None,
-        circuit_breaker: MockCircuitBreaker | None = None,
-        allowed_tools: list[str] | None = None,
-        is_active: bool = True,
-    ) -> None:
-        self.id = agent_id
-        self.agent_type = agent_type
-        self.capabilities = capabilities or ["web_search", "source_discovery"]
-        self.allowed_domains = allowed_domains or []
-        self.blocked_domains = blocked_domains or []
-        self.max_budget_usd = max_budget_usd
-        self.rate_limits = rate_limits or MockRateLimits()
-        self.circuit_breaker = circuit_breaker or MockCircuitBreaker()
-        self.allowed_tools = allowed_tools or ["web_search", "url_fetch"]
-        self.is_active = is_active
+# Import shared mock classes from conftest
+from ci.evaluation.conftest import (
+    MockCircuitBreakerConfig,
+    MockManifest,
+    MockRateLimits,
+)
 
 
 # =============================================================================

@@ -38,6 +38,7 @@ from src.api.dependencies import (
     rate_limit_standard,
     rate_limit_streaming,
 )
+from src.api.models import ErrorResponse
 from src.api.streaming import (
     SSEConfig,
     StreamEvent,
@@ -191,15 +192,6 @@ class HealthResponse(BaseModel):
     version: str
     timestamp: datetime
     checks: dict[str, dict[str, Any]]
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response model."""
-
-    error: str
-    detail: str | None = None
-    code: str | None = None
-    request_id: str | None = None
 
 
 # =============================================================================

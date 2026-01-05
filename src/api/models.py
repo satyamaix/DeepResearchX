@@ -655,13 +655,19 @@ class ErrorDetail(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Standard API error response."""
+    """Standard API error response.
 
-    error: str
-    message: str
-    details: list[ErrorDetail] | None = None
-    request_id: str | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    This is the canonical error response model used across all API routes.
+    Import this from src.api.models instead of defining locally.
+    """
+
+    error: str = Field(..., description="Error type or category")
+    message: str | None = Field(default=None, description="Human-readable error message")
+    detail: str | None = Field(default=None, description="Additional error details")
+    code: str | None = Field(default=None, description="Machine-readable error code")
+    details: list[ErrorDetail] | None = Field(default=None, description="Structured error details")
+    request_id: str | None = Field(default=None, description="Request ID for tracing")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the error occurred")
 
 
 # =============================================================================

@@ -27,10 +27,15 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict, cast
 
 import redis.asyncio as redis
 from redis.asyncio.connection import ConnectionPool
+
+from src.metadata.circuit_breaker import (
+    CircuitBreakerConfigDict,
+    DEFAULT_CIRCUIT_BREAKER_CONFIG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,19 +104,11 @@ class InvocationRecord(TypedDict):
     error_type: str | None
 
 
-class CircuitBreakerConfig(TypedDict):
-    """Configuration for circuit breaker behavior.
-
-    Attributes:
-        failure_threshold: Number of failures before circuit opens
-        recovery_timeout_seconds: Time before attempting recovery
-        half_open_max_calls: Maximum calls allowed in half-open state
-        error_rate_threshold: Error rate threshold to trigger circuit open (0.0-1.0)
-    """
-    failure_threshold: int
-    recovery_timeout_seconds: int
-    half_open_max_calls: int
-    error_rate_threshold: float
+# CircuitBreakerConfig is an alias to the canonical CircuitBreakerConfigDict
+# from circuit_breaker.py for backward compatibility in this module.
+# Note: This previously used 'recovery_timeout_seconds' which is now
+# standardized as 'timeout_seconds' (30 seconds default) across the codebase.
+CircuitBreakerConfig = CircuitBreakerConfigDict
 
 
 # =============================================================================
@@ -121,13 +118,8 @@ class CircuitBreakerConfig(TypedDict):
 # Key prefix for all DRX agent keys
 KEY_PREFIX = "drx:agent"
 
-# Default circuit breaker configuration
-DEFAULT_CIRCUIT_CONFIG: CircuitBreakerConfig = {
-    "failure_threshold": 5,
-    "recovery_timeout_seconds": 60,
-    "half_open_max_calls": 3,
-    "error_rate_threshold": 0.5,
-}
+# Default circuit breaker configuration - uses canonical defaults from circuit_breaker.py
+DEFAULT_CIRCUIT_CONFIG: CircuitBreakerConfig = DEFAULT_CIRCUIT_BREAKER_CONFIG
 
 # Default retention period for invocation data (1 hour)
 DEFAULT_RETENTION_SECONDS = 3600
@@ -737,7 +729,7 @@ class ActiveStateService:
                 return "closed"
 
             if status in ("closed", "open", "half_open"):
-                return status  # type: ignore
+                return cast(Literal["closed", "open", "half_open"], status)
 
             # Invalid status, default to closed
             logger.warning(f"Invalid circuit status for {agent_id}: {status}")
@@ -897,7 +889,7 @@ class ActiveStateService:
                 if opened_at_str:
                     opened_at = float(opened_at_str)
                     elapsed = time.time() - opened_at
-                    recovery_timeout = config["recovery_timeout_seconds"]
+                    recovery_timeout = config.get("timeout_seconds", 30)
 
                     if elapsed >= recovery_timeout:
                         # Transition to half-open
@@ -918,7 +910,7 @@ class ActiveStateService:
                 if count == 1:
                     await self.redis.expire(
                         half_open_key,
-                        config["recovery_timeout_seconds"],
+                        config.get("timeout_seconds", 30),
                     )
 
                 max_calls = config["half_open_max_calls"]

@@ -12,7 +12,6 @@ The replay system supports:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator
@@ -23,7 +22,6 @@ if TYPE_CHECKING:
     from psycopg import AsyncConnection
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from src.db.connection import get_async_connection
 from src.orchestrator.checkpointer import get_checkpointer
 from src.replay.recorder import EventRecorder, ReplayEvent
 

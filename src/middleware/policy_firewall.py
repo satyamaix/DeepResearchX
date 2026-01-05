@@ -44,11 +44,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 import uuid
+from collections.abc import Awaitable, Callable, Coroutine
 from datetime import datetime, timezone
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Literal, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, ParamSpec, TypedDict, TypeVar
 
 from src.middleware.domain_validator import DomainValidator
 
@@ -59,7 +59,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 # =============================================================================
@@ -351,6 +352,21 @@ class PolicyFirewall:
         self._manifest_cache: dict[str, "AgentManifest"] = {}
         self._lock = asyncio.Lock()
 
+    def _get_config_float(self, key: str, default: float) -> float:
+        """Get a float config value with type safety."""
+        value = self.config.get(key, default)
+        return float(value) if value is not None else default
+
+    def _get_config_int(self, key: str, default: int) -> int:
+        """Get an int config value with type safety."""
+        value = self.config.get(key, default)
+        return int(value) if value is not None else default
+
+    def _get_config_bool(self, key: str, default: bool) -> bool:
+        """Get a bool config value with type safety."""
+        value = self.config.get(key, default)
+        return bool(value) if value is not None else default
+
     async def _get_manifest(self, agent_id: str) -> "AgentManifest | None":
         """
         Get agent manifest with caching.
@@ -429,7 +445,7 @@ class PolicyFirewall:
         manifest = await self._get_manifest(agent_id)
 
         # 1. Check domain restrictions
-        if self.config.get("enforce_domains", True):
+        if self._get_config_bool("enforce_domains", True):
             domain_violations = await self._check_domain_policy(
                 agent_id=agent_id,
                 tool_name=tool_name,
@@ -443,7 +459,7 @@ class PolicyFirewall:
                 )
 
         # 2. Check budget limits
-        if self.config.get("enforce_budget", True) and estimated_cost:
+        if self._get_config_bool("enforce_budget", True) and estimated_cost:
             budget_violation = await self._check_budget_policy(
                 agent_id=agent_id,
                 estimated_cost=estimated_cost,
@@ -457,7 +473,7 @@ class PolicyFirewall:
                 )
 
         # 3. Check rate limits
-        if self.config.get("enforce_rate_limits", True):
+        if self._get_config_bool("enforce_rate_limits", True):
             rate_limit_violation = await self._check_rate_limit_policy(
                 agent_id=agent_id,
                 manifest=manifest,
@@ -469,7 +485,7 @@ class PolicyFirewall:
                 )
 
         # 4. Check capability requirements
-        if self.config.get("enforce_capabilities", True):
+        if self._get_config_bool("enforce_capabilities", True):
             capability_violation = await self._check_capability_policy(
                 agent_id=agent_id,
                 tool_name=tool_name,
@@ -639,7 +655,7 @@ class PolicyFirewall:
             PolicyViolation if budget would be exceeded, None otherwise
         """
         # Get max budget from manifest or default
-        max_budget = self.config.get("default_budget_usd", 1.0)
+        max_budget = self._get_config_float("default_budget_usd", 1.0)
         if manifest:
             max_budget = manifest.max_budget_usd
 
@@ -773,10 +789,10 @@ class PolicyFirewall:
         )
 
         if violation:
-            if self.config.get("log_violations", True):
+            if self._get_config_bool("log_violations", True):
                 await self.log_violation(agent_id, violation, session_id)
 
-            max_budget = manifest.max_budget_usd if manifest else self.config.get("default_budget_usd", 1.0)
+            max_budget = manifest.max_budget_usd if manifest else self._get_config_float("default_budget_usd", 1.0)
             current_spend = await self._get_current_spend(agent_id, session_id)
 
             raise BudgetExceededError(
@@ -807,8 +823,8 @@ class PolicyFirewall:
             PolicyViolation if rate limited, None otherwise
         """
         # Get rate limits from manifest or defaults
-        rpm_limit = self.config.get("default_rpm", 60)
-        tpm_limit = self.config.get("default_tpm", 100000)
+        rpm_limit: int = self._get_config_int("default_rpm", 60)
+        tpm_limit: int = self._get_config_int("default_tpm", 100000)
 
         if manifest:
             rpm_limit = manifest.rate_limits.requests_per_minute
@@ -869,9 +885,9 @@ class PolicyFirewall:
         """
         default_state: RateLimitState = {
             "requests_count": 0,
-            "requests_limit": self.config.get("default_rpm", 60),
+            "requests_limit": self._get_config_int("default_rpm", 60),
             "tokens_count": 0,
-            "tokens_limit": self.config.get("default_tpm", 100000),
+            "tokens_limit": self._get_config_int("default_tpm", 100000),
             "window_start": datetime.now(timezone.utc).isoformat(),
             "retry_after_seconds": None,
         }
@@ -941,9 +957,9 @@ class PolicyFirewall:
 
             return RateLimitState(
                 requests_count=int(results[0]),
-                requests_limit=self.config.get("default_rpm", 60),
+                requests_limit=self._get_config_int("default_rpm", 60),
                 tokens_count=int(results[1]),
-                tokens_limit=self.config.get("default_tpm", 100000),
+                tokens_limit=self._get_config_int("default_tpm", 100000),
                 window_start=now,
                 retry_after_seconds=60.0,
             )
@@ -976,7 +992,7 @@ class PolicyFirewall:
         violation = await self._check_rate_limit_policy(agent_id, manifest)
 
         if violation:
-            if self.config.get("log_violations", True):
+            if self._get_config_bool("log_violations", True):
                 await self.log_violation(agent_id, violation)
 
             details = violation["details"]
@@ -1075,7 +1091,7 @@ class PolicyFirewall:
             step_id: Optional step context
             tool_invocation_id: Optional tool invocation context
         """
-        if not self.config.get("log_violations", True):
+        if not self._get_config_bool("log_violations", True):
             return
 
         logger.warning(
@@ -1093,7 +1109,7 @@ class PolicyFirewall:
             )
 
         # Emit event
-        if self.config.get("emit_events", True):
+        if self._get_config_bool("emit_events", True):
             await self._emit_violation_event(
                 violation=violation,
                 session_id=session_id,
@@ -1234,7 +1250,7 @@ class PolicyFirewall:
         tool: "BaseTool",
         agent_id: str,
         session_id: str | None = None,
-    ) -> Callable[[str, Any], Any]:
+    ) -> Callable[..., Awaitable[ToolResult]]:
         """
         Create a wrapped tool execution function with policy enforcement.
 
@@ -1345,13 +1361,13 @@ class PolicyFirewall:
             BudgetState with current spend and limits
         """
         manifest = await self._get_manifest(agent_id)
-        max_budget = manifest.max_budget_usd if manifest else self.config.get("default_budget_usd", 1.0)
+        max_budget = manifest.max_budget_usd if manifest else self._get_config_float("default_budget_usd", 1.0)
         current_spend = await self._get_current_spend(agent_id, session_id)
 
         return BudgetState(
             total_spent=current_spend,
             max_budget=max_budget,
-            remaining=max(0, max_budget - current_spend),
+            remaining=max(0.0, max_budget - current_spend),
             last_updated=datetime.now(timezone.utc).isoformat(),
         )
 
@@ -1396,9 +1412,12 @@ def enforce_policy(
     firewall: PolicyFirewall,
     agent_id: str,
     session_id: str | None = None,
-) -> Callable[[Callable[..., T]], Callable[..., T]]:
+) -> Callable[
+    [Callable[P, Coroutine[Any, Any, R]]],
+    Callable[P, Coroutine[Any, Any, R]],
+]:
     """
-    Decorator to enforce policy on tool methods.
+    Decorator to enforce policy on async tool methods.
 
     Usage:
         @enforce_policy(firewall, "searcher_v1")
@@ -1412,17 +1431,19 @@ def enforce_policy(
         session_id: Optional session context
 
     Returns:
-        Decorated function with policy enforcement
+        Decorated async function with policy enforcement
     """
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    def decorator(
+        func: Callable[P, Coroutine[Any, Any, R]],
+    ) -> Callable[P, Coroutine[Any, Any, R]]:
         @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Extract tool name from function
             tool_name = func.__name__
 
             # Build args dict
-            tool_args = kwargs.copy()
+            tool_args = dict(kwargs)
 
             # Check policy
             result = await firewall.check_policy(
