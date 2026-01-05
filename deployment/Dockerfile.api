@@ -1,0 +1,132 @@
+# =============================================================================
+# DRX Deep Research - FastAPI Application Dockerfile
+# Multi-stage build for optimized production image
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder - Install dependencies and build wheels
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS builder
+
+# Prevent Python from writing bytecode and buffering stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip and install build tools
+RUN pip install --upgrade pip setuptools wheel hatchling
+
+# Copy dependency files
+WORKDIR /build
+COPY pyproject.toml ./
+
+# Install dependencies (production only, no dev dependencies)
+RUN pip install . --no-cache-dir
+
+# -----------------------------------------------------------------------------
+# Stage 2: Runtime - Minimal production image
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS runtime
+
+# Build arguments
+ARG ENVIRONMENT=development
+ARG VERSION=1.0.0
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Labels for container metadata
+LABEL org.opencontainers.image.title="DRX API" \
+      org.opencontainers.image.description="DRX Deep Research FastAPI Application" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="DRX Team" \
+      org.opencontainers.image.source="https://github.com/drx/deep-research"
+
+# Environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1 \
+    # Application settings
+    APP_HOME=/app \
+    APP_USER=drx \
+    APP_GROUP=drx \
+    # Virtual environment
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    # Uvicorn settings
+    UVICORN_HOST=0.0.0.0 \
+    UVICORN_PORT=8000 \
+    UVICORN_WORKERS=1 \
+    UVICORN_LOOP=uvloop \
+    UVICORN_HTTP=httptools \
+    UVICORN_BACKLOG=2048 \
+    UVICORN_TIMEOUT_KEEP_ALIVE=120 \
+    # Python optimizations
+    PYTHONOPTIMIZE=1 \
+    PYTHONHASHSEED=random
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # PostgreSQL client library (required by psycopg)
+    libpq5 \
+    # HTTP client for health checks
+    curl \
+    # TLS/SSL support
+    ca-certificates \
+    # Timezone data
+    tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/*
+
+# Create non-root user for security
+RUN groupadd --gid 1000 ${APP_GROUP} \
+    && useradd --uid 1000 --gid ${APP_GROUP} --shell /bin/bash --create-home ${APP_USER}
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Set working directory
+WORKDIR ${APP_HOME}
+
+# Copy application source code
+COPY --chown=${APP_USER}:${APP_GROUP} src/ ./src/
+COPY --chown=${APP_USER}:${APP_GROUP} pyproject.toml ./
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/.cache /app/logs \
+    && chown -R ${APP_USER}:${APP_GROUP} /app
+
+# Switch to non-root user
+USER ${APP_USER}
+
+# Expose FastAPI port
+EXPOSE 8000
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Default entrypoint and command
+ENTRYPOINT ["python", "-m"]
+CMD ["uvicorn", "src.api.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--loop", "uvloop", \
+     "--http", "httptools", \
+     "--no-access-log", \
+     "--proxy-headers", \
+     "--forwarded-allow-ips", "*"]

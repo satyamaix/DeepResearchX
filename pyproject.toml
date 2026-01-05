@@ -1,0 +1,105 @@
+[project]
+name = "drx"
+version = "1.0.0"
+description = "Deep Research X - Multi-agent DAG-orchestrated research system"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "DRX Team"}
+]
+keywords = ["ai", "agents", "research", "langgraph", "llm"]
+
+dependencies = [
+    # Core LangGraph
+    "langgraph>=1.0.0",
+    "langgraph-checkpoint-postgres>=3.0.0",
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+
+    # Database
+    "psycopg[binary]>=3.2.0",
+    "pgvector>=0.3.0",
+    "asyncpg>=0.30.0",
+    "sqlalchemy>=2.0.0",
+
+    # Redis & Queue
+    "redis>=5.0.0",
+    "celery>=5.4.0",
+
+    # API
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sse-starlette>=2.0.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+
+    # HTTP & Search
+    "httpx>=0.28.0",
+    "tavily-python>=0.5.0",
+
+    # Observability
+    "arize-phoenix>=12.0.0",
+    "arize-phoenix-otel>=0.14.0",
+    "openinference-instrumentation-langchain>=0.1.0",
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
+
+    # Guardrails
+    "nemoguardrails>=0.19.0",
+
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "tenacity>=9.0.0",
+    "structlog>=24.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
+]
+eval = [
+    "deepeval>=1.0.0",
+    "ragas>=0.1.0",
+]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.28.0",
+]
+
+[project.scripts]
+drx-api = "src.api.main:main"
+drx-worker = "src.worker:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"

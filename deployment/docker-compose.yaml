@@ -1,0 +1,251 @@
+# DRX Deep Research - Development Docker Compose Stack
+# Usage: docker compose up -d
+# View logs: docker compose logs -f
+# Stop: docker compose down
+
+name: drx-dev
+
+services:
+  # =============================================================================
+  # PostgreSQL 16 with pgvector extension for vector embeddings
+  # =============================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: drx-postgres
+    hostname: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-drx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drx_password}
+      POSTGRES_DB: ${POSTGRES_DB:-drx}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-drx} -d ${POSTGRES_DB:-drx}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - drx-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Valkey (Redis-compatible) for Celery broker and caching
+  # =============================================================================
+  redis:
+    image: valkey/valkey:7
+    container_name: drx-redis
+    hostname: redis
+    command: >
+      valkey-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - drx-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # Arize Phoenix for LLM observability and tracing
+  # =============================================================================
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: drx-phoenix
+    hostname: phoenix
+    environment:
+      # PostgreSQL backend for persistent storage
+      PHOENIX_SQL_DATABASE_URL: postgresql://${POSTGRES_USER:-drx}:${POSTGRES_PASSWORD:-drx_password}@postgres:5432/${POSTGRES_DB:-drx}
+      PHOENIX_SQL_DATABASE_SCHEMA: phoenix
+      # Security: disable external resource loading
+      PHOENIX_ALLOW_EXTERNAL_RESOURCES: "false"
+      # Working directory for Phoenix
+      PHOENIX_WORKING_DIR: /phoenix/data
+      # Enable OTLP collector
+      PHOENIX_GRPC_PORT: 4317
+      PHOENIX_PORT: 6006
+    ports:
+      - "6006:6006"    # Phoenix UI
+      - "4317:4317"    # OTLP gRPC endpoint
+    volumes:
+      - phoenix_data:/phoenix/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6006/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - drx-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # FastAPI Application Server
+  # =============================================================================
+  api:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.api
+    container_name: drx-api
+    hostname: api
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-drx}:${POSTGRES_PASSWORD:-drx_password}@postgres:5432/${POSTGRES_DB:-drx}
+      POSTGRES_USER: ${POSTGRES_USER:-drx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drx_password}
+      POSTGRES_DB: ${POSTGRES_DB:-drx}
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      # Phoenix observability
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:4317
+      PHOENIX_PROJECT_NAME: ${PHOENIX_PROJECT_NAME:-drx-research}
+      # OpenRouter API
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      # Tavily Search
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      # Application
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      # Model configuration
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-google/gemini-3-flash-preview}
+      REASONING_MODEL: ${REASONING_MODEL:-deepseek/deepseek-r1}
+      MAX_TOKENS_PER_REQUEST: ${MAX_TOKENS_PER_REQUEST:-100000}
+      DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
+      # Research settings
+      MAX_RESEARCH_ITERATIONS: ${MAX_RESEARCH_ITERATIONS:-5}
+      MAX_SOURCES_PER_QUERY: ${MAX_SOURCES_PER_QUERY:-20}
+      TOKEN_BUDGET_PER_SESSION: ${TOKEN_BUDGET_PER_SESSION:-500000}
+      # Rate limiting
+      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-60}
+      RATE_LIMIT_TOKENS_PER_MINUTE: ${RATE_LIMIT_TOKENS_PER_MINUTE:-1000000}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      phoenix:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    # Development: mount source for hot reload
+    volumes:
+      - ../src:/app/src:ro
+      - ../.env:/app/.env:ro
+
+  # =============================================================================
+  # Celery Worker for async task processing
+  # =============================================================================
+  worker:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.worker
+    container_name: drx-worker
+    hostname: worker
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-drx}:${POSTGRES_PASSWORD:-drx_password}@postgres:5432/${POSTGRES_DB:-drx}
+      POSTGRES_USER: ${POSTGRES_USER:-drx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drx_password}
+      POSTGRES_DB: ${POSTGRES_DB:-drx}
+      # Redis/Celery
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      # Phoenix observability
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:4317
+      PHOENIX_PROJECT_NAME: ${PHOENIX_PROJECT_NAME:-drx-research}
+      # OpenRouter API
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      # Tavily Search
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      # Application
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Model configuration
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-google/gemini-3-flash-preview}
+      REASONING_MODEL: ${REASONING_MODEL:-deepseek/deepseek-r1}
+      MAX_TOKENS_PER_REQUEST: ${MAX_TOKENS_PER_REQUEST:-100000}
+      DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
+      # Research settings
+      MAX_RESEARCH_ITERATIONS: ${MAX_RESEARCH_ITERATIONS:-5}
+      MAX_SOURCES_PER_QUERY: ${MAX_SOURCES_PER_QUERY:-20}
+      TOKEN_BUDGET_PER_SESSION: ${TOKEN_BUDGET_PER_SESSION:-500000}
+      # Celery worker settings
+      CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-4}
+      CELERY_WORKER_PREFETCH_MULTIPLIER: ${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      phoenix:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.worker inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    # Development: mount source for hot reload
+    volumes:
+      - ../src:/app/src:ro
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  drx-network:
+    driver: bridge
+    name: drx-network
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    name: drx-postgres-data
+  redis_data:
+    name: drx-redis-data
+  phoenix_data:
+    name: drx-phoenix-data

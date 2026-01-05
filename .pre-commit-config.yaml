@@ -1,0 +1,189 @@
+# DRX Deep Research - Pre-commit Configuration
+# Run: pre-commit install && pre-commit run --all-files
+# Docs: https://pre-commit.com/
+
+default_language_version:
+  python: python3.11
+
+default_stages: [commit, push]
+
+repos:
+  # =============================================================================
+  # General File Hygiene
+  # =============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # Trailing whitespace removal
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        args: [--markdown-linebreak-ext=md]
+
+      # End of file fixer
+      - id: end-of-file-fixer
+        name: Fix end of files
+        exclude: ^(.*\.json|.*\.svg)$
+
+      # YAML validation
+      - id: check-yaml
+        name: Check YAML syntax
+        args: [--unsafe]  # Allow custom tags
+
+      # JSON validation
+      - id: check-json
+        name: Check JSON syntax
+
+      # TOML validation
+      - id: check-toml
+        name: Check TOML syntax
+
+      # Large file prevention
+      - id: check-added-large-files
+        name: Check for large files
+        args: [--maxkb=1000]
+
+      # Merge conflict markers
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+
+      # Debug statements
+      - id: debug-statements
+        name: Check for debug statements
+
+      # Docstring in first line
+      - id: check-docstring-first
+        name: Check docstring placement
+
+      # Shebang scripts are executable
+      - id: check-shebang-scripts-are-executable
+        name: Check shebang scripts are executable
+
+      # Symlink check
+      - id: check-symlinks
+        name: Check for broken symlinks
+
+      # Case conflict detection
+      - id: check-case-conflict
+        name: Check for case conflicts
+
+      # Private key detection
+      - id: detect-private-key
+        name: Detect private keys
+
+  # =============================================================================
+  # Python Code Quality - Ruff (Linting + Formatting)
+  # =============================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.3
+    hooks:
+      # Ruff linter
+      - id: ruff
+        name: Ruff linter
+        args:
+          - --fix
+          - --exit-non-zero-on-fix
+        types_or: [python, pyi]
+
+      # Ruff formatter (replaces black)
+      - id: ruff-format
+        name: Ruff formatter
+        types_or: [python, pyi]
+
+  # =============================================================================
+  # Python Type Checking - MyPy
+  # =============================================================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        name: MyPy type checker
+        args:
+          - --strict
+          - --ignore-missing-imports
+          - --python-version=3.11
+          - --no-error-summary
+        additional_dependencies:
+          - types-redis
+          - types-requests
+          - pydantic>=2.0
+        files: ^src/
+        pass_filenames: false
+        # Run on entire src/ directory for better type inference
+        entry: mypy src/
+
+  # =============================================================================
+  # Security - Secret Detection
+  # =============================================================================
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        args:
+          - --baseline
+          - .secrets.baseline
+        exclude: >
+          (?x)^(
+            .*\.lock|
+            .*\.json|
+            \.secrets\.baseline|
+            tests/fixtures/.*
+          )$
+
+  # =============================================================================
+  # Dockerfile Linting
+  # =============================================================================
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.13.0-beta
+    hooks:
+      - id: hadolint-docker
+        name: Hadolint Dockerfile linter
+        args:
+          - --ignore=DL3008  # Pin versions in apt-get
+          - --ignore=DL3013  # Pin versions in pip
+
+  # =============================================================================
+  # Shell Script Linting
+  # =============================================================================
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        name: ShellCheck
+        args: [--severity=warning]
+
+  # =============================================================================
+  # Commit Message Linting
+  # =============================================================================
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.31.0
+    hooks:
+      - id: commitizen
+        name: Commitizen check
+        stages: [commit-msg]
+
+  # =============================================================================
+  # GitHub Actions Validation
+  # =============================================================================
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.4
+    hooks:
+      - id: actionlint
+        name: GitHub Actions linter
+
+# =============================================================================
+# CI Configuration
+# =============================================================================
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: develop
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip:
+    - hadolint-docker  # Requires Docker in CI
+    - mypy  # Run separately in CI for better caching
+  submodules: false

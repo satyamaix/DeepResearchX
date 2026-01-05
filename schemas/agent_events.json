@@ -1,0 +1,834 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://drx.research.io/schemas/agent-events/v1",
+  "title": "DRX Agent Events Schema",
+  "description": "JSON Schema definitions for agent tracing events in the DRX Deep Research platform",
+  "version": "1.0.0",
+
+  "definitions": {
+    "UUID": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "UUID v4 format"
+    },
+
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp with timezone"
+    },
+
+    "TraceContext": {
+      "type": "object",
+      "description": "OpenTelemetry-compatible trace context",
+      "properties": {
+        "trace_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "description": "128-bit trace identifier as 32 hex characters"
+        },
+        "span_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$",
+          "description": "64-bit span identifier as 16 hex characters"
+        },
+        "parent_span_id": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{16}$",
+          "description": "Parent span identifier, null for root spans"
+        },
+        "trace_flags": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "default": 1,
+          "description": "W3C trace flags (1 = sampled)"
+        },
+        "trace_state": {
+          "type": ["string", "null"],
+          "description": "W3C trace state for vendor-specific data"
+        }
+      },
+      "required": ["trace_id", "span_id"]
+    },
+
+    "ResourceMetrics": {
+      "type": "object",
+      "description": "Resource consumption metrics",
+      "properties": {
+        "tokens_used": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total tokens consumed"
+        },
+        "prompt_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Input/prompt tokens"
+        },
+        "completion_tokens": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Output/completion tokens"
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Estimated cost in USD"
+        },
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total latency in milliseconds"
+        },
+        "queue_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Time spent in queue"
+        },
+        "execution_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Actual execution time"
+        }
+      }
+    },
+
+    "AgentType": {
+      "type": "string",
+      "enum": [
+        "orchestrator",
+        "planner",
+        "searcher",
+        "reader",
+        "reasoner",
+        "writer",
+        "critic",
+        "synthesizer"
+      ],
+      "description": "Type of agent in the system"
+    },
+
+    "StepType": {
+      "type": "string",
+      "enum": [
+        "query_analysis",
+        "plan_generation",
+        "search_execution",
+        "content_extraction",
+        "reasoning",
+        "synthesis",
+        "quality_check",
+        "final_output"
+      ],
+      "description": "Type of research step"
+    },
+
+    "EventStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "skipped",
+        "retrying",
+        "cancelled"
+      ],
+      "description": "Status of the event/operation"
+    },
+
+    "ThoughtSignature": {
+      "type": "object",
+      "description": "Captures agent reasoning and thought process for transparency",
+      "properties": {
+        "thought_id": {
+          "$ref": "#/definitions/UUID",
+          "description": "Unique identifier for this thought"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sequence number in the thought chain"
+        },
+        "thought_type": {
+          "type": "string",
+          "enum": [
+            "observation",
+            "hypothesis",
+            "reasoning",
+            "decision",
+            "reflection",
+            "planning",
+            "evaluation"
+          ],
+          "description": "Classification of the thought"
+        },
+        "content": {
+          "type": "string",
+          "description": "The actual thought content"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Agent's confidence in this thought (0-1)"
+        },
+        "supporting_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "description": "Reference to evidence source"
+              },
+              "relevance": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "excerpt": {
+                "type": "string",
+                "description": "Relevant excerpt from source"
+              }
+            }
+          },
+          "description": "Evidence supporting this thought"
+        },
+        "contradicting_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "concern": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Evidence that contradicts this thought"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UUID"
+          },
+          "description": "IDs of thoughts this depends on"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Additional thought metadata"
+        },
+        "timestamp": {
+          "$ref": "#/definitions/Timestamp"
+        }
+      },
+      "required": ["thought_id", "thought_type", "content", "timestamp"]
+    },
+
+    "ToolInvocation": {
+      "type": "object",
+      "description": "Record of a tool being invoked by an agent",
+      "properties": {
+        "invocation_id": {
+          "$ref": "#/definitions/UUID",
+          "description": "Unique identifier for this invocation"
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Name of the tool being invoked"
+        },
+        "tool_version": {
+          "type": "string",
+          "description": "Version of the tool"
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "ID of the agent invoking the tool"
+        },
+        "agent_type": {
+          "$ref": "#/definitions/AgentType"
+        },
+        "input": {
+          "type": "object",
+          "description": "Input parameters for the tool",
+          "properties": {
+            "params": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Tool-specific parameters"
+            },
+            "context": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Contextual information"
+            }
+          }
+        },
+        "output": {
+          "type": ["object", "null"],
+          "description": "Output from the tool",
+          "properties": {
+            "result": {
+              "description": "Tool execution result"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "uri": {
+                    "type": "string"
+                  },
+                  "size_bytes": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "description": "Generated artifacts"
+            }
+          }
+        },
+        "status": {
+          "$ref": "#/definitions/EventStatus"
+        },
+        "error": {
+          "type": ["object", "null"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code"
+            },
+            "message": {
+              "type": "string",
+              "description": "Error message"
+            },
+            "type": {
+              "type": "string",
+              "description": "Error type/class"
+            },
+            "retryable": {
+              "type": "boolean",
+              "description": "Whether the error is retryable"
+            },
+            "stack_trace": {
+              "type": "string",
+              "description": "Stack trace if available"
+            }
+          }
+        },
+        "metrics": {
+          "$ref": "#/definitions/ResourceMetrics"
+        },
+        "rate_limit": {
+          "type": "object",
+          "properties": {
+            "bucket": {
+              "type": "string",
+              "description": "Rate limit bucket identifier"
+            },
+            "remaining": {
+              "type": "integer",
+              "description": "Remaining requests in window"
+            },
+            "reset_at": {
+              "$ref": "#/definitions/Timestamp",
+              "description": "When the rate limit resets"
+            }
+          }
+        },
+        "trace": {
+          "$ref": "#/definitions/TraceContext"
+        },
+        "started_at": {
+          "$ref": "#/definitions/Timestamp"
+        },
+        "completed_at": {
+          "$ref": "#/definitions/Timestamp"
+        }
+      },
+      "required": ["invocation_id", "tool_name", "agent_id", "status", "started_at"]
+    },
+
+    "PolicyViolation": {
+      "type": "object",
+      "description": "Record of a policy violation detected during execution",
+      "properties": {
+        "violation_id": {
+          "$ref": "#/definitions/UUID",
+          "description": "Unique identifier for this violation"
+        },
+        "violation_type": {
+          "type": "string",
+          "enum": [
+            "content_policy",
+            "rate_limit",
+            "budget_exceeded",
+            "domain_restriction",
+            "tool_permission",
+            "data_access",
+            "output_format",
+            "timeout",
+            "resource_limit",
+            "security"
+          ],
+          "description": "Category of violation"
+        },
+        "violation_code": {
+          "type": "string",
+          "pattern": "^[A-Z]{2,4}_[0-9]{3,4}$",
+          "description": "Unique violation code (e.g., POL_001, SEC_0012)"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "critical"],
+          "description": "Severity level of the violation"
+        },
+        "policy": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the violated policy"
+            },
+            "version": {
+              "type": "string",
+              "description": "Version of the policy"
+            },
+            "rule_id": {
+              "type": "string",
+              "description": "Specific rule within the policy"
+            },
+            "description": {
+              "type": "string",
+              "description": "Human-readable policy description"
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "$ref": "#/definitions/UUID"
+            },
+            "step_id": {
+              "$ref": "#/definitions/UUID"
+            },
+            "agent_id": {
+              "type": "string"
+            },
+            "tool_invocation_id": {
+              "$ref": "#/definitions/UUID"
+            }
+          },
+          "description": "Execution context where violation occurred"
+        },
+        "trigger": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Action that triggered the violation"
+            },
+            "input": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Input that caused the violation"
+            },
+            "matched_pattern": {
+              "type": "string",
+              "description": "Pattern or rule that was matched"
+            }
+          },
+          "description": "What triggered the violation"
+        },
+        "impact": {
+          "type": "object",
+          "properties": {
+            "blocked_execution": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether execution was blocked"
+            },
+            "requires_human_review": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether human review is required"
+            },
+            "auto_remediated": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether auto-remediation was applied"
+            },
+            "remediation_action": {
+              "type": "string",
+              "description": "Remediation action taken"
+            }
+          }
+        },
+        "resolution": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["unresolved", "acknowledged", "resolved", "false_positive"],
+              "default": "unresolved"
+            },
+            "resolved_by": {
+              "type": "string",
+              "description": "User or system that resolved"
+            },
+            "resolved_at": {
+              "$ref": "#/definitions/Timestamp"
+            },
+            "notes": {
+              "type": "string",
+              "description": "Resolution notes"
+            }
+          }
+        },
+        "trace": {
+          "$ref": "#/definitions/TraceContext"
+        },
+        "detected_at": {
+          "$ref": "#/definitions/Timestamp"
+        }
+      },
+      "required": ["violation_id", "violation_type", "violation_code", "severity", "detected_at"]
+    },
+
+    "AgentStepEvent": {
+      "type": "object",
+      "description": "Event emitted during agent step execution",
+      "properties": {
+        "event_id": {
+          "$ref": "#/definitions/UUID",
+          "description": "Unique identifier for this event"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "step_started",
+            "step_progress",
+            "step_completed",
+            "step_failed",
+            "step_retrying",
+            "step_cancelled",
+            "thought_generated",
+            "tool_invoked",
+            "tool_completed",
+            "policy_checked",
+            "policy_violated",
+            "checkpoint_saved",
+            "checkpoint_restored"
+          ],
+          "description": "Type of event"
+        },
+        "event_version": {
+          "type": "string",
+          "default": "1.0",
+          "description": "Schema version for this event type"
+        },
+        "session": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "$ref": "#/definitions/UUID"
+            },
+            "user_id": {
+              "type": "string"
+            },
+            "query_hash": {
+              "type": "string"
+            }
+          },
+          "required": ["session_id"],
+          "description": "Session context"
+        },
+        "step": {
+          "type": "object",
+          "properties": {
+            "step_id": {
+              "$ref": "#/definitions/UUID"
+            },
+            "parent_step_id": {
+              "$ref": "#/definitions/UUID"
+            },
+            "step_type": {
+              "$ref": "#/definitions/StepType"
+            },
+            "step_name": {
+              "type": "string"
+            },
+            "step_order": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "depth": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["step_id", "step_type"],
+          "description": "Step context"
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "agent_id": {
+              "type": "string"
+            },
+            "agent_type": {
+              "$ref": "#/definitions/AgentType"
+            },
+            "agent_version": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string",
+              "description": "LLM model being used"
+            }
+          },
+          "required": ["agent_id", "agent_type"],
+          "description": "Agent context"
+        },
+        "status": {
+          "$ref": "#/definitions/EventStatus"
+        },
+        "progress": {
+          "type": "object",
+          "properties": {
+            "percentage": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "current_phase": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "items_processed": {
+              "type": "integer"
+            },
+            "items_total": {
+              "type": "integer"
+            }
+          },
+          "description": "Progress information"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Input data for the step"
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Output data from the step"
+        },
+        "thoughts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ThoughtSignature"
+          },
+          "description": "Thought chain generated during this event"
+        },
+        "tool_invocations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ToolInvocation"
+          },
+          "description": "Tools invoked during this step"
+        },
+        "policy_violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PolicyViolation"
+          },
+          "description": "Policy violations detected"
+        },
+        "quality": {
+          "type": "object",
+          "properties": {
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Overall quality score"
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Confidence in the output"
+            },
+            "dimensions": {
+              "type": "object",
+              "properties": {
+                "accuracy": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "completeness": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "relevance": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "coherence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "description": "Quality dimension scores"
+            }
+          },
+          "description": "Quality assessment"
+        },
+        "metrics": {
+          "$ref": "#/definitions/ResourceMetrics"
+        },
+        "error": {
+          "type": ["object", "null"],
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "retry_count": {
+              "type": "integer"
+            },
+            "max_retries": {
+              "type": "integer"
+            }
+          },
+          "description": "Error information if step failed"
+        },
+        "checkpoint": {
+          "type": "object",
+          "properties": {
+            "checkpoint_id": {
+              "$ref": "#/definitions/UUID"
+            },
+            "state_hash": {
+              "type": "string"
+            },
+            "resumable": {
+              "type": "boolean"
+            }
+          },
+          "description": "Checkpoint information for resumability"
+        },
+        "trace": {
+          "$ref": "#/definitions/TraceContext"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Additional event metadata"
+        },
+        "timestamp": {
+          "$ref": "#/definitions/Timestamp"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Event duration in milliseconds"
+        }
+      },
+      "required": [
+        "event_id",
+        "event_type",
+        "session",
+        "step",
+        "agent",
+        "status",
+        "timestamp"
+      ]
+    },
+
+    "StreamEvent": {
+      "type": "object",
+      "description": "Event for Server-Sent Events streaming to clients",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Event ID for SSE"
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "connected",
+            "heartbeat",
+            "progress",
+            "step_update",
+            "thought",
+            "source_found",
+            "result_partial",
+            "result_final",
+            "error",
+            "complete"
+          ],
+          "description": "Event type for SSE"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "$ref": "#/definitions/UUID"
+            },
+            "interaction_id": {
+              "type": "string"
+            },
+            "timestamp": {
+              "$ref": "#/definitions/Timestamp"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "retry": {
+          "type": "integer",
+          "description": "Reconnection time in milliseconds"
+        }
+      },
+      "required": ["event", "data"]
+    }
+  },
+
+  "oneOf": [
+    { "$ref": "#/definitions/AgentStepEvent" },
+    { "$ref": "#/definitions/ToolInvocation" },
+    { "$ref": "#/definitions/ThoughtSignature" },
+    { "$ref": "#/definitions/PolicyViolation" },
+    { "$ref": "#/definitions/StreamEvent" }
+  ]
+}

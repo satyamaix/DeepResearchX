@@ -1,0 +1,471 @@
+# DRX Deep Research - Production Docker Compose Stack
+# Usage: docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d
+# Note: This file extends docker-compose.yaml with production overrides
+
+name: drx-prod
+
+services:
+  # =============================================================================
+  # PostgreSQL - Production Configuration
+  # =============================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: drx-postgres-prod
+    hostname: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # Production PostgreSQL tuning
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind only to localhost in production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+        compress: "true"
+
+  # =============================================================================
+  # Valkey (Redis) - Production Configuration
+  # =============================================================================
+  redis:
+    image: valkey/valkey:7
+    container_name: drx-redis-prod
+    hostname: redis
+    command: >
+      valkey-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+      --timeout 0
+      --tcp-backlog 511
+      --protected-mode yes
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind only to localhost
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # =============================================================================
+  # Arize Phoenix - Production Configuration
+  # =============================================================================
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: drx-phoenix-prod
+    hostname: phoenix
+    environment:
+      PHOENIX_SQL_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PHOENIX_SQL_DATABASE_SCHEMA: phoenix
+      PHOENIX_ALLOW_EXTERNAL_RESOURCES: "false"
+      PHOENIX_WORKING_DIR: /phoenix/data
+      PHOENIX_GRPC_PORT: 4317
+      PHOENIX_PORT: 6006
+      # Production settings
+      PHOENIX_ENABLE_PROMETHEUS: "true"
+    ports:
+      - "127.0.0.1:6006:6006"    # Phoenix UI - localhost only
+      - "127.0.0.1:4317:4317"    # OTLP endpoint - localhost only
+    volumes:
+      - phoenix_data:/phoenix/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6006/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # =============================================================================
+  # FastAPI Application Server - Production Configuration
+  # =============================================================================
+  api:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.api
+      args:
+        ENVIRONMENT: production
+    image: drx-api:${VERSION:-latest}
+    container_name: drx-api-prod
+    hostname: api
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      # Phoenix observability
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:4317
+      PHOENIX_PROJECT_NAME: ${PHOENIX_PROJECT_NAME:-drx-research}
+      # OpenRouter API
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      # Tavily Search
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      # Production application settings
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+      SECRET_KEY: ${SECRET_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      # Model configuration
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-google/gemini-3-flash-preview}
+      REASONING_MODEL: ${REASONING_MODEL:-deepseek/deepseek-r1}
+      MAX_TOKENS_PER_REQUEST: ${MAX_TOKENS_PER_REQUEST:-100000}
+      DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
+      # Research settings
+      MAX_RESEARCH_ITERATIONS: ${MAX_RESEARCH_ITERATIONS:-5}
+      MAX_SOURCES_PER_QUERY: ${MAX_SOURCES_PER_QUERY:-20}
+      TOKEN_BUDGET_PER_SESSION: ${TOKEN_BUDGET_PER_SESSION:-500000}
+      # Rate limiting
+      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-60}
+      RATE_LIMIT_TOKENS_PER_MINUTE: ${RATE_LIMIT_TOKENS_PER_MINUTE:-1000000}
+      # Production uvicorn settings
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-4}
+      UVICORN_BACKLOG: 2048
+      UVICORN_TIMEOUT_KEEP_ALIVE: 120
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      phoenix:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=256M
+      - /app/.cache:size=128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+        compress: "true"
+
+  # =============================================================================
+  # Celery Workers - Production Configuration with Replicas
+  # =============================================================================
+  worker:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.worker
+      args:
+        ENVIRONMENT: production
+    image: drx-worker:${VERSION:-latest}
+    hostname: worker-{{.Task.Slot}}
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Redis/Celery
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      # Phoenix observability
+      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:4317
+      PHOENIX_PROJECT_NAME: ${PHOENIX_PROJECT_NAME:-drx-research}
+      # OpenRouter API
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      # Tavily Search
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      # Production application settings
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+      # Model configuration
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-google/gemini-3-flash-preview}
+      REASONING_MODEL: ${REASONING_MODEL:-deepseek/deepseek-r1}
+      MAX_TOKENS_PER_REQUEST: ${MAX_TOKENS_PER_REQUEST:-100000}
+      DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
+      # Research settings
+      MAX_RESEARCH_ITERATIONS: ${MAX_RESEARCH_ITERATIONS:-5}
+      MAX_SOURCES_PER_QUERY: ${MAX_SOURCES_PER_QUERY:-20}
+      TOKEN_BUDGET_PER_SESSION: ${TOKEN_BUDGET_PER_SESSION:-500000}
+      # Production Celery settings
+      CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-8}
+      CELERY_WORKER_PREFETCH_MULTIPLIER: 1
+      CELERY_WORKER_MAX_TASKS_PER_CHILD: 1000
+      CELERY_WORKER_MAX_MEMORY_PER_CHILD: 2000000  # 2GB in KB
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      phoenix:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.worker inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 90s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      replicas: 3
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=256M
+      - /app/.cache:size=128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+        compress: "true"
+
+  # =============================================================================
+  # Celery Beat Scheduler - Production Configuration
+  # =============================================================================
+  beat:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.worker
+      args:
+        ENVIRONMENT: production
+    image: drx-worker:${VERSION:-latest}
+    container_name: drx-beat-prod
+    hostname: beat
+    command: >
+      celery -A src.worker beat
+      --loglevel=${LOG_LEVEL:-warning}
+      --scheduler=celery.beat:PersistentScheduler
+      --schedule=/tmp/celerybeat-schedule
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Redis/Celery
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      # Application
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-WARNING}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat-schedule || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # =============================================================================
+  # Celery Flower - Task Monitoring Dashboard (Optional)
+  # =============================================================================
+  flower:
+    image: mher/flower:2.0
+    container_name: drx-flower-prod
+    hostname: flower
+    command: >
+      celery
+      --broker=redis://redis:6379/0
+      flower
+      --port=5555
+      --basic-auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower_password}
+      --persistent=true
+      --db=/data/flower.db
+      --max-tasks=10000
+    ports:
+      - "127.0.0.1:5555:5555"  # Localhost only - use reverse proxy for external access
+    volumes:
+      - flower_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5555/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - drx-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    profiles:
+      - monitoring
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  drx-network:
+    driver: bridge
+    name: drx-network-prod
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    name: drx-postgres-data-prod
+  redis_data:
+    name: drx-redis-data-prod
+  phoenix_data:
+    name: drx-phoenix-data-prod
+  flower_data:
+    name: drx-flower-data-prod
