@@ -16,92 +16,70 @@
 
 ### System Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│                                    CLIENT LAYER                                      │
-├─────────────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
-│  │   Web UI     │    │   CLI Tool   │    │  SDK Client  │    │  Webhook     │       │
-│  │  (React/Vue) │    │   (Python)   │    │ (Python/JS)  │    │  Consumer    │       │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘    └──────┬───────┘       │
-│         │                   │                   │                   │               │
-│         └───────────────────┴───────────────────┴───────────────────┘               │
-│                                      │                                               │
-│                              HTTPS / WebSocket                                       │
-│                                      │                                               │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│                                API GATEWAY LAYER                                     │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│                                      ▼                                               │
-│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
-│  │                           FastAPI Application                                  │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │  │
-│  │  │ Auth/RBAC   │  │ Rate Limit  │  │   CORS      │  │  Request Validation │   │  │
-│  │  │ Middleware  │  │ Middleware  │  │ Middleware  │  │     Middleware      │   │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────┘   │  │
-│  │                                                                                │  │
-│  │  ┌──────────────────────────────────────────────────────────────────────────┐ │  │
-│  │  │                            Route Handlers                                 │ │  │
-│  │  │  POST /interactions  │  GET /stream  │  POST /replay  │  GET /health    │ │  │
-│  │  └──────────────────────────────────────────────────────────────────────────┘ │  │
-│  └───────────────────────────────────────────────────────────────────────────────┘  │
-│                                      │                                               │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│                              ORCHESTRATION LAYER                                     │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│                                      ▼                                               │
-│  ┌───────────────────────────────────────────────────────────────────────────────┐  │
-│  │                        LangGraph StateGraph Orchestrator                       │  │
-│  │                                                                                │  │
-│  │    ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────────┐        │  │
-│  │    │ Planner  │────▶│ Searcher │────▶│  Reader  │────▶│ Synthesizer  │        │  │
-│  │    │  Agent   │     │  Agent   │     │  Agent   │     │    Agent     │        │  │
-│  │    └──────────┘     └──────────┘     └──────────┘     └──────────────┘        │  │
-│  │         │                                                    │                 │  │
-│  │         │           ┌──────────┐     ┌──────────┐           │                 │  │
-│  │         └──────────▶│  Critic  │◀───▶│ Reporter │◀──────────┘                 │  │
-│  │                     │  Agent   │     │  Agent   │                             │  │
-│  │                     └──────────┘     └──────────┘                             │  │
-│  │                          │                │                                    │  │
-│  │                          └────────────────┴──▶ Final Output                   │  │
-│  └───────────────────────────────────────────────────────────────────────────────┘  │
-│                                      │                                               │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│                               METADATA LAYER                                         │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                 │
-│  │   Policy    │  │  Circuit    │  │ Capability  │  │  Context    │                 │
-│  │  Firewall   │  │  Breaker    │  │   Router    │  │ Propagator  │                 │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘                 │
-│                                      │                                               │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│                                 DATA LAYER                                           │
-├──────────────────────────────────────┼──────────────────────────────────────────────┤
-│                                      ▼                                               │
-│  ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐                │
-│  │     PostgreSQL    │  │       Redis       │  │   Object Store    │                │
-│  │   + pgvector      │  │    (Valkey)       │  │    (Optional)     │                │
-│  │                   │  │                   │  │                   │                │
-│  │ • Sessions        │  │ • Active State    │  │ • Large Files     │                │
-│  │ • Steps           │  │ • Rate Limits     │  │ • Attachments     │                │
-│  │ • Checkpoints     │  │ • Circuit Status  │  │ • Exports         │                │
-│  │ • Embeddings      │  │ • Pub/Sub Events  │  │                   │                │
-│  │ • Violations      │  │ • Session Cache   │  │                   │                │
-│  └───────────────────┘  └───────────────────┘  └───────────────────┘                │
-│                                                                                      │
-├──────────────────────────────────────────────────────────────────────────────────────┤
-│                            EXTERNAL SERVICES LAYER                                   │
-├──────────────────────────────────────────────────────────────────────────────────────┤
-│  ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐                │
-│  │    OpenRouter     │  │      Tavily       │  │      Phoenix      │                │
-│  │    (LLM API)      │  │   (Web Search)    │  │  (Observability)  │                │
-│  │                   │  │                   │  │                   │                │
-│  │ • Gemini Flash    │  │ • Search API      │  │ • Trace Storage   │                │
-│  │ • DeepSeek R1     │  │ • Extract API     │  │ • Span Viewer     │                │
-│  │ • Claude          │  │                   │  │ • Eval Dashboard  │                │
-│  │ • GPT-4           │  │                   │  │                   │                │
-│  └───────────────────┘  └───────────────────┘  └───────────────────┘                │
-└──────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph ClientLayer["Client Layer"]
+        WebUI["Web UI<br/>(React/Vue)"]
+        CLI["CLI Tool<br/>(Python)"]
+        SDK["SDK Client<br/>(Python/JS)"]
+        Webhook["Webhook<br/>Consumer"]
+    end
+
+    subgraph APIGateway["API Gateway Layer"]
+        subgraph Middleware["Middleware Stack"]
+            Auth["Auth/RBAC"]
+            RateLimit["Rate Limit"]
+            CORS["CORS"]
+            Validation["Request<br/>Validation"]
+        end
+        subgraph Routes["Route Handlers"]
+            POST_INT["POST /interactions"]
+            GET_STREAM["GET /stream"]
+            POST_REPLAY["POST /replay"]
+            GET_HEALTH["GET /health"]
+        end
+    end
+
+    subgraph Orchestration["Orchestration Layer"]
+        subgraph LangGraph["LangGraph StateGraph"]
+            Planner["Planner<br/>Agent"]
+            Searcher["Searcher<br/>Agent"]
+            Reader["Reader<br/>Agent"]
+            Synthesizer["Synthesizer<br/>Agent"]
+            Critic["Critic<br/>Agent"]
+            Reporter["Reporter<br/>Agent"]
+        end
+    end
+
+    subgraph MetadataLayer["Metadata Layer"]
+        PolicyFW["Policy<br/>Firewall"]
+        CircuitB["Circuit<br/>Breaker"]
+        CapRouter["Capability<br/>Router"]
+        ContextProp["Context<br/>Propagator"]
+    end
+
+    subgraph DataLayer["Data Layer"]
+        Postgres[("PostgreSQL<br/>+ pgvector")]
+        Redis[("Redis<br/>(Valkey)")]
+        ObjectStore[("Object Store<br/>(Optional)")]
+    end
+
+    subgraph ExternalServices["External Services"]
+        OpenRouter["OpenRouter<br/>(LLM API)"]
+        Tavily["Tavily<br/>(Web Search)"]
+        Phoenix["Phoenix<br/>(Observability)"]
+    end
+
+    ClientLayer -->|"HTTPS/WebSocket"| APIGateway
+    APIGateway --> Orchestration
+    Orchestration --> MetadataLayer
+    MetadataLayer --> DataLayer
+    Orchestration --> ExternalServices
+
+    Planner --> Searcher --> Reader --> Synthesizer
+    Synthesizer --> Critic
+    Critic --> Reporter
+    Critic -.->|"Gaps Found"| Planner
 ```
 
 ### Component Summary
@@ -121,167 +99,133 @@
 
 ### Research DAG (Directed Acyclic Graph)
 
-```
-                                    ┌─────────────────────┐
-                                    │    User Request     │
-                                    │   (Research Query)  │
-                                    └──────────┬──────────┘
-                                               │
-                                               ▼
-                              ┌────────────────────────────────┐
-                              │         PLANNER AGENT          │
-                              │                                │
-                              │  • Query analysis              │
-                              │  • Sub-question decomposition  │
-                              │  • DAG generation              │
-                              │  • Priority assignment         │
-                              └────────────────┬───────────────┘
-                                               │
-                                               ▼
-                              ┌────────────────────────────────┐
-                              │        SEARCHER AGENT          │
-                              │                                │
-                              │  • Query expansion             │
-                              │  • Web search (Tavily)         │
-                              │  • RAG retrieval (pgvector)    │
-                              │  • Source deduplication        │
-                              │  • Relevance filtering         │
-                              └────────────────┬───────────────┘
-                                               │
-                          ┌────────────────────┴────────────────────┐
-                          │           Parallel Fan-Out              │
-                          ▼                                         ▼
-               ┌──────────────────┐                     ┌──────────────────┐
-               │   READER AGENT   │        ...          │   READER AGENT   │
-               │   (Source 1)     │                     │   (Source N)     │
-               │                  │                     │                  │
-               │ • Content fetch  │                     │ • Content fetch  │
-               │ • HTML parsing   │                     │ • PDF extraction │
-               │ • Entity extract │                     │ • Entity extract │
-               │ • Citation build │                     │ • Citation build │
-               └────────┬─────────┘                     └────────┬─────────┘
-                        │                                        │
-                        └────────────────┬───────────────────────┘
-                                         │
-                                         ▼
-                              ┌────────────────────────────────┐
-                              │      SYNTHESIZER AGENT         │
-                              │                                │
-                              │  • Finding aggregation         │
-                              │  • Conflict detection          │
-                              │  • Argument graph building     │
-                              │  • Consensus formation         │
-                              │  • Evidence weighting          │
-                              └────────────────┬───────────────┘
-                                               │
-                                               ▼
-                              ┌────────────────────────────────┐
-                              │         CRITIC AGENT           │
-                              │                                │
-                              │  • Quality assessment          │
-                              │  • Gap identification          │
-                              │  • Source verification         │
-                              │  • Hallucination detection     │
-                              │  • Coverage scoring            │
-                              └────────────────┬───────────────┘
-                                               │
-                                    ┌──────────┴──────────┐
-                                    │    Coverage OK?     │
-                                    └──────────┬──────────┘
-                                               │
-                           ┌───────────────────┴───────────────────┐
-                           │                                       │
-                     NO (gaps found)                         YES (complete)
-                           │                                       │
-                           ▼                                       ▼
-              ┌─────────────────────┐               ┌────────────────────────────┐
-              │  Generate new sub-  │               │       REPORTER AGENT       │
-              │  questions for gaps │               │                            │
-              └──────────┬──────────┘               │  • Report generation       │
-                         │                          │  • Citation formatting     │
-                         │                          │  • Executive summary       │
-                         ▼                          │  • Multi-format export     │
-              ┌─────────────────────┐               │    (MD, HTML, PDF, JSON)   │
-              │   Back to PLANNER   │               └────────────────┬───────────┘
-              │  (iteration += 1)   │                                │
-              └─────────────────────┘                                ▼
-                                                    ┌────────────────────────────┐
-                                                    │       Final Output         │
-                                                    │   (Research Report)        │
-                                                    └────────────────────────────┘
+```mermaid
+flowchart TB
+    UserQuery["User Request<br/>(Research Query)"]
+
+    subgraph PlannerBox["PLANNER AGENT"]
+        P1["Query analysis"]
+        P2["Sub-question decomposition"]
+        P3["DAG generation"]
+        P4["Priority assignment"]
+    end
+
+    subgraph SearcherBox["SEARCHER AGENT"]
+        S1["Query expansion"]
+        S2["Web search (OpenRouter/Tavily)"]
+        S3["RAG retrieval (pgvector)"]
+        S4["Source deduplication"]
+        S5["Relevance filtering"]
+    end
+
+    subgraph ReaderFanOut["Parallel Fan-Out"]
+        Reader1["READER AGENT<br/>(Source 1)<br/>HTML parsing"]
+        Reader2["READER AGENT<br/>(Source 2)<br/>PDF extraction"]
+        ReaderN["READER AGENT<br/>(Source N)<br/>Entity extract"]
+    end
+
+    subgraph SynthesizerBox["SYNTHESIZER AGENT"]
+        SY1["Finding aggregation"]
+        SY2["Conflict detection"]
+        SY3["Argument graph building"]
+        SY4["Consensus formation"]
+        SY5["Evidence weighting"]
+    end
+
+    subgraph CriticBox["CRITIC AGENT"]
+        C1["Quality assessment"]
+        C2["Gap identification"]
+        C3["Source verification"]
+        C4["Hallucination detection"]
+        C5["Coverage scoring"]
+    end
+
+    CoverageCheck{"Coverage OK?"}
+
+    subgraph ReporterBox["REPORTER AGENT"]
+        R1["Report generation"]
+        R2["Citation formatting"]
+        R3["Executive summary"]
+        R4["Multi-format export<br/>(MD, HTML, PDF, JSON)"]
+    end
+
+    FinalOutput["Final Output<br/>(Research Report)"]
+
+    UserQuery --> PlannerBox
+    PlannerBox --> SearcherBox
+    SearcherBox --> ReaderFanOut
+    ReaderFanOut --> SynthesizerBox
+    SynthesizerBox --> CriticBox
+    CriticBox --> CoverageCheck
+
+    CoverageCheck -->|"YES (complete)"| ReporterBox
+    CoverageCheck -->|"NO (gaps found)"| PlannerBox
+
+    ReporterBox --> FinalOutput
 ```
 
 ### State Machine Diagram
 
-```
-                                    ┌─────────────┐
-                                    │   PENDING   │
-                                    │   (init)    │
-                                    └──────┬──────┘
-                                           │ start()
-                                           ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              RUNNING STATE                                    │
-│                                                                               │
-│   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐              │
-│   │  plan    │───▶│  search  │───▶│   read   │───▶│synthesize│              │
-│   └──────────┘    └──────────┘    └──────────┘    └──────────┘              │
-│        │                                               │                      │
-│        │              ┌──────────┐                     │                      │
-│        └─────────────▶│ critique │◀────────────────────┘                      │
-│                       └────┬─────┘                                            │
-│                            │                                                  │
-│              ┌─────────────┼─────────────┐                                   │
-│              │             │             │                                    │
-│              ▼             ▼             ▼                                    │
-│        ┌──────────┐  ┌──────────┐  ┌──────────┐                              │
-│        │  report  │  │ continue │  │   fail   │                              │
-│        └────┬─────┘  └────┬─────┘  └────┬─────┘                              │
-│             │             │             │                                     │
-└─────────────┼─────────────┼─────────────┼─────────────────────────────────────┘
-              │             │             │
-              ▼             │             ▼
-       ┌───────────┐        │      ┌───────────┐
-       │ COMPLETED │        │      │  FAILED   │
-       └───────────┘        │      └───────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              │                           │
-              ▼                           ▼
-       ┌───────────┐              ┌───────────┐
-       │  PAUSED   │◀────────────▶│ CANCELLED │
-       │ (resume)  │   cancel()   └───────────┘
-       └───────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: init
+
+    PENDING --> RUNNING: start()
+
+    state RUNNING {
+        [*] --> plan
+        plan --> search
+        search --> read
+        read --> synthesize
+        synthesize --> critique
+
+        critique --> report: complete
+        critique --> plan: gaps found
+        critique --> [*]: fail
+    }
+
+    RUNNING --> COMPLETED: report done
+    RUNNING --> FAILED: error
+    RUNNING --> PAUSED: pause()
+    RUNNING --> CANCELLED: cancel()
+
+    PAUSED --> RUNNING: resume()
+    PAUSED --> CANCELLED: cancel()
+
+    COMPLETED --> [*]
+    FAILED --> [*]
+    CANCELLED --> [*]
 ```
 
 ### Agent Communication Pattern
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Shared State (AgentState)                             │
-│                                                                                  │
-│  ┌──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐  │
-│  │   messages   │    plan      │   findings   │  citations   │   synthesis  │  │
-│  │  (chat log)  │  (DAG nodes) │ (extracted)  │  (sources)   │  (combined)  │  │
-│  └──────────────┴──────────────┴──────────────┴──────────────┴──────────────┘  │
-│  ┌──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐  │
-│  │     gaps     │ final_report │ iteration    │ tokens_used  │   metrics    │  │
-│  │  (missing)   │   (output)   │   (count)    │   (budget)   │  (quality)   │  │
-│  └──────────────┴──────────────┴──────────────┴──────────────┴──────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                        │
-            ┌───────────────────────────┼───────────────────────────┐
-            │                           │                           │
-            ▼                           ▼                           ▼
-     ┌─────────────┐             ┌─────────────┐             ┌─────────────┐
-     │   Agent 1   │             │   Agent 2   │             │   Agent N   │
-     │             │             │             │             │             │
-     │ read state  │             │ read state  │             │ read state  │
-     │     ↓       │             │     ↓       │             │     ↓       │
-     │  process    │             │  process    │             │  process    │
-     │     ↓       │             │     ↓       │             │     ↓       │
-     │ write state │             │ write state │             │ write state │
-     └─────────────┘             └─────────────┘             └─────────────┘
+```mermaid
+flowchart TB
+    subgraph SharedState["Shared State (AgentState)"]
+        direction LR
+        messages["messages<br/>(chat log)"]
+        plan["plan<br/>(DAG nodes)"]
+        findings["findings<br/>(extracted)"]
+        citations["citations<br/>(sources)"]
+        synthesis["synthesis<br/>(combined)"]
+        gaps["gaps<br/>(missing)"]
+        final_report["final_report<br/>(output)"]
+        iteration["iteration<br/>(count)"]
+        tokens_used["tokens_used<br/>(budget)"]
+        metrics["metrics<br/>(quality)"]
+    end
+
+    Agent1["Agent 1<br/>read → process → write"]
+    Agent2["Agent 2<br/>read → process → write"]
+    AgentN["Agent N<br/>read → process → write"]
+
+    SharedState --> Agent1
+    SharedState --> Agent2
+    SharedState --> AgentN
+
+    Agent1 --> SharedState
+    Agent2 --> SharedState
+    AgentN --> SharedState
 ```
 
 ---
@@ -290,183 +234,156 @@
 
 ### API Gateway Components
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              FastAPI Application                                 │
-│                                                                                  │
-│  ┌────────────────────────────────────────────────────────────────────────────┐ │
-│  │                           Middleware Stack                                  │ │
-│  │                                                                             │ │
-│  │  Request ──▶ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ──▶ Handler  │ │
-│  │              │Request  │ │  Auth   │ │  Rate   │ │ Timing  │               │ │
-│  │              │   ID    │ │  Check  │ │  Limit  │ │  Track  │               │ │
-│  │              └─────────┘ └─────────┘ └─────────┘ └─────────┘               │ │
-│  └────────────────────────────────────────────────────────────────────────────┘ │
-│                                                                                  │
-│  ┌────────────────────────────────────────────────────────────────────────────┐ │
-│  │                            Route Handlers                                   │ │
-│  │                                                                             │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   │ │
-│  │  │ /api/v1/interactions                                                │   │ │
-│  │  │   POST   - Create new research interaction                          │   │ │
-│  │  │   GET    - List interactions                                        │   │ │
-│  │  │   GET /{id} - Get interaction details                               │   │ │
-│  │  │   DELETE /{id} - Cancel interaction                                 │   │ │
-│  │  └─────────────────────────────────────────────────────────────────────┘   │ │
-│  │                                                                             │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   │ │
-│  │  │ /api/v1/interactions/{id}/stream                                    │   │ │
-│  │  │   GET    - SSE stream for real-time updates                         │   │ │
-│  │  │           Supports Last-Event-ID for resume                         │   │ │
-│  │  └─────────────────────────────────────────────────────────────────────┘   │ │
-│  │                                                                             │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   │ │
-│  │  │ /api/v1/interactions/{id}/replay                                    │   │ │
-│  │  │   POST   - Start replay from checkpoint                             │   │ │
-│  │  │   GET /events - Get recorded events                                 │   │ │
-│  │  │   POST /compare - Compare original vs replay                        │   │ │
-│  │  └─────────────────────────────────────────────────────────────────────┘   │ │
-│  │                                                                             │ │
-│  │  ┌─────────────────────────────────────────────────────────────────────┐   │ │
-│  │  │ /api/v1/health                                                      │   │ │
-│  │  │   GET    - Health check endpoint                                    │   │ │
-│  │  └─────────────────────────────────────────────────────────────────────┘   │ │
-│  └────────────────────────────────────────────────────────────────────────────┘ │
-│                                                                                  │
-│  ┌────────────────────────────────────────────────────────────────────────────┐ │
-│  │                         Dependency Injection                                │ │
-│  │                                                                             │ │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │ │
-│  │  │  DatabaseDep │  │   RedisDep   │  │OrchestratorDep│  │CurrentUserDep│   │ │
-│  │  │  (psycopg)   │  │   (redis)    │  │ (LangGraph)  │  │   (auth)     │   │ │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │ │
-│  └────────────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph FastAPI["FastAPI Application"]
+        subgraph MiddlewareStack["Middleware Stack"]
+            direction LR
+            ReqID["Request ID"]
+            AuthCheck["Auth Check"]
+            RateLim["Rate Limit"]
+            TimeTrack["Time Track"]
+        end
+
+        subgraph RouteHandlers["Route Handlers"]
+            Interactions["/api/v1/interactions<br/>POST - Create<br/>GET - List<br/>GET /{id} - Details<br/>DELETE /{id} - Cancel"]
+            Stream["/api/v1/interactions/{id}/stream<br/>GET - SSE stream<br/>Supports Last-Event-ID"]
+            Replay["/api/v1/interactions/{id}/replay<br/>POST - Start replay<br/>GET /events - Get events<br/>POST /compare - Compare"]
+            Health["/api/v1/health<br/>GET - Health check"]
+        end
+
+        subgraph DI["Dependency Injection"]
+            DatabaseDep["DatabaseDep<br/>(psycopg)"]
+            RedisDep["RedisDep<br/>(redis)"]
+            OrchestratorDep["OrchestratorDep<br/>(LangGraph)"]
+            CurrentUserDep["CurrentUserDep<br/>(auth)"]
+        end
+    end
+
+    Request["Request"] --> MiddlewareStack
+    MiddlewareStack --> RouteHandlers
+    RouteHandlers --> DI
 ```
 
 ### Agent Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                               BaseAgent                                          │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                  │
-│  Properties:                          Methods:                                   │
-│  ┌────────────────────────┐          ┌─────────────────────────────────────┐   │
-│  │ • agent_id: str        │          │ • __call__(state) -> AgentState     │   │
-│  │ • agent_type: str      │          │ • _process(state) -> AgentResponse  │   │
-│  │ • system_prompt: str   │          │ • _post_process(state, response)    │   │
-│  │ • llm_client: LLMClient│          │ • _validate_input(state) -> bool    │   │
-│  │ • tools: list[Tool]    │          │ • _emit_event(event_type, data)     │   │
-│  │ • manifest: AgentManifest│        │ • _record_metrics(metrics)          │   │
-│  └────────────────────────┘          └─────────────────────────────────────┘   │
-│                                                                                  │
-└────────────────────────────────────────┬────────────────────────────────────────┘
-                                         │ extends
-        ┌────────────────┬───────────────┼───────────────┬────────────────┐
-        │                │               │               │                │
-        ▼                ▼               ▼               ▼                ▼
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│PlannerAgent  │ │SearcherAgent │ │ ReaderAgent  │ │SynthesizerAgent│ │ CriticAgent │
-├──────────────┤ ├──────────────┤ ├──────────────┤ ├──────────────┤ ├──────────────┤
-│              │ │              │ │              │ │              │ │              │
-│Capabilities: │ │Capabilities: │ │Capabilities: │ │Capabilities: │ │Capabilities: │
-│• decompose   │ │• web_search  │ │• html_parse  │ │• aggregate   │ │• evaluate    │
-│• prioritize  │ │• rag_search  │ │• pdf_extract │ │• conflict_   │ │• verify      │
-│• dag_build   │ │• query_      │ │• entity_     │ │  resolve     │ │• gap_find    │
-│              │ │  expand      │ │  extract     │ │• argument_   │ │• score       │
-│              │ │              │ │              │ │  graph       │ │              │
-└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
-        │                │               │               │                │
-        │                │               │               │                │
-        ▼                ▼               ▼               ▼                ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                              Tool Integration                                     │
-│                                                                                   │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐ │
-│  │  TavilySearch  │  │ RAGRetriever   │  │  HTMLParser    │  │  PDFExtractor  │ │
-│  │    Tool        │  │    Tool        │  │    Tool        │  │    Tool        │ │
-│  └────────────────┘  └────────────────┘  └────────────────┘  └────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+classDiagram
+    class BaseAgent {
+        +agent_id: str
+        +agent_type: str
+        +system_prompt: str
+        +llm_client: LLMClient
+        +tools: list[Tool]
+        +manifest: AgentManifest
+        +__call__(state) AgentState
+        +_process(state) AgentResponse
+        +_post_process(state, response) AgentState
+        +_validate_input(state) bool
+        +_emit_event(event_type, data)
+        +_record_metrics(metrics)
+    }
+
+    class PlannerAgent {
+        +_decompose()
+        +_prioritize()
+        +_build_dag()
+    }
+
+    class SearcherAgent {
+        +_expand_query()
+        +_search()
+        +_dedupe()
+    }
+
+    class ReaderAgent {
+        +_fetch_content()
+        +_extract()
+        +_parse()
+    }
+
+    class SynthesizerAgent {
+        +_aggregate()
+        +_resolve_conflicts()
+        +_build_argument()
+    }
+
+    class CriticAgent {
+        +_evaluate()
+        +_find_gaps()
+        +_score()
+        +_verify()
+    }
+
+    class ReporterAgent {
+        +_generate()
+        +_format()
+        +_cite()
+    }
+
+    BaseAgent <|-- PlannerAgent
+    BaseAgent <|-- SearcherAgent
+    BaseAgent <|-- ReaderAgent
+    BaseAgent <|-- SynthesizerAgent
+    BaseAgent <|-- CriticAgent
+    BaseAgent <|-- ReporterAgent
+
+    class ToolIntegration {
+        +OpenRouterSearch
+        +TavilySearch
+        +RAGRetriever
+        +HTMLParser
+        +PDFExtractor
+    }
+
+    PlannerAgent --> ToolIntegration
+    SearcherAgent --> ToolIntegration
+    ReaderAgent --> ToolIntegration
 ```
 
 ### Metadata Layer Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Metadata Infrastructure                               │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                  │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐│
-│  │                          Agent Manifest System                               ││
-│  │                                                                              ││
-│  │  ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐    ││
-│  │  │  JSON Schema     │────▶│  Pydantic Model  │────▶│  Registry Load   │    ││
-│  │  │  (Validation)    │     │  (Type Safety)   │     │  (Database)      │    ││
-│  │  └──────────────────┘     └──────────────────┘     └──────────────────┘    ││
-│  │                                                                              ││
-│  │  Manifest Contents:                                                          ││
-│  │  • agent_id, version, capabilities                                           ││
-│  │  • allowed_domains, blocked_domains                                          ││
-│  │  • max_budget_usd, rate_limits                                              ││
-│  │  • circuit_breaker config                                                    ││
-│  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                                                                  │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐│
-│  │                          Policy Firewall                                     ││
-│  │                                                                              ││
-│  │            Tool Invocation                                                   ││
-│  │                  │                                                           ││
-│  │                  ▼                                                           ││
-│  │  ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐       ││
-│  │  │ Domain Validator │───▶│ Budget Enforcer  │───▶│ Rate Limiter     │       ││
-│  │  │                  │    │                  │    │                  │       ││
-│  │  │ • URL extraction │    │ • Spend tracking │    │ • Sliding window │       ││
-│  │  │ • Wildcard match │    │ • Cost estimate  │    │ • Token counting │       ││
-│  │  │ • Block/allow    │    │ • Budget check   │    │ • Burst control  │       ││
-│  │  └──────────────────┘    └──────────────────┘    └──────────────────┘       ││
-│  │            │                      │                      │                   ││
-│  │            └──────────────────────┴──────────────────────┘                   ││
-│  │                                   │                                          ││
-│  │                                   ▼                                          ││
-│  │                    ┌──────────────────────────────┐                         ││
-│  │                    │     Violation Logger         │                         ││
-│  │                    │                              │                         ││
-│  │                    │ • PostgreSQL audit table     │                         ││
-│  │                    │ • Redis event stream         │                         ││
-│  │                    └──────────────────────────────┘                         ││
-│  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                                                                  │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐│
-│  │                          Circuit Breaker                                     ││
-│  │                                                                              ││
-│  │      ┌─────────┐         ┌─────────┐         ┌─────────────┐                ││
-│  │      │ CLOSED  │────────▶│  OPEN   │────────▶│ HALF-OPEN   │                ││
-│  │      │(normal) │ failure │(failing)│ timeout │  (testing)  │                ││
-│  │      └────┬────┘ threshold└─────────┘         └──────┬──────┘                ││
-│  │           │                                          │                       ││
-│  │           └─────────────── success ──────────────────┘                       ││
-│  │                          threshold                                           ││
-│  │                                                                              ││
-│  │  Integrations:                                                               ││
-│  │  • Redis state storage (drx:agent:{id}:circuit)                             ││
-│  │  • Health checker (latency, error rates)                                     ││
-│  │  • Automatic rerouting to alternative agents                                 ││
-│  └─────────────────────────────────────────────────────────────────────────────┘│
-│                                                                                  │
-│  ┌─────────────────────────────────────────────────────────────────────────────┐│
-│  │                       Capability-Based Routing                               ││
-│  │                                                                              ││
-│  │  Task Requirements          Agent Scoring                 Selection          ││
-│  │  ┌──────────────┐          ┌──────────────┐          ┌──────────────┐       ││
-│  │  │• Capabilities│────────▶ │• Capability  │────────▶ │• Best match  │       ││
-│  │  │• Domain needs│          │  match: 0.3  │          │• Fallback    │       ││
-│  │  │• Cost tier   │          │• Health: 0.2 │          │  selection   │       ││
-│  │  │• Latency req │          │• Load: 0.2   │          │• Error if    │       ││
-│  │  └──────────────┘          │• Cost: -0.1  │          │  none avail  │       ││
-│  │                            └──────────────┘          └──────────────┘       ││
-│  └─────────────────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph MetadataInfra["Metadata Infrastructure"]
+        subgraph ManifestSystem["Agent Manifest System"]
+            JSONSchema["JSON Schema<br/>(Validation)"]
+            PydanticModel["Pydantic Model<br/>(Type Safety)"]
+            RegistryLoad["Registry Load<br/>(Database)"]
+
+            JSONSchema --> PydanticModel --> RegistryLoad
+        end
+
+        subgraph PolicyFirewall["Policy Firewall"]
+            DomainValidator["Domain Validator<br/>URL extraction<br/>Wildcard match<br/>Block/allow"]
+            BudgetEnforcer["Budget Enforcer<br/>Spend tracking<br/>Cost estimate<br/>Budget check"]
+            RateLimiter["Rate Limiter<br/>Sliding window<br/>Token counting<br/>Burst control"]
+            ViolationLogger["Violation Logger<br/>PostgreSQL audit<br/>Redis events"]
+
+            DomainValidator --> ViolationLogger
+            BudgetEnforcer --> ViolationLogger
+            RateLimiter --> ViolationLogger
+        end
+
+        subgraph CircuitBreaker["Circuit Breaker"]
+            CLOSED["CLOSED<br/>(normal)"]
+            OPEN["OPEN<br/>(failing)"]
+            HALF_OPEN["HALF-OPEN<br/>(testing)"]
+
+            CLOSED -->|"failure threshold"| OPEN
+            OPEN -->|"timeout"| HALF_OPEN
+            HALF_OPEN -->|"success threshold"| CLOSED
+            HALF_OPEN -->|"failure"| OPEN
+        end
+
+        subgraph CapabilityRouting["Capability-Based Routing"]
+            TaskReqs["Task Requirements<br/>Capabilities<br/>Domain needs<br/>Cost tier<br/>Latency req"]
+            AgentScoring["Agent Scoring<br/>Capability match: 0.3<br/>Health: 0.2<br/>Load: 0.2<br/>Cost: -0.1"]
+            Selection["Selection<br/>Best match<br/>Fallback<br/>Error if none"]
+
+            TaskReqs --> AgentScoring --> Selection
+        end
+    end
 ```
 
 ---
@@ -475,159 +392,102 @@
 
 ### Request Lifecycle
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              Request Lifecycle                                   │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as API Gateway
+    participant DB as PostgreSQL
+    participant R as Redis
+    participant O as Orchestrator
+    participant A as Agents
+    participant LLM as OpenRouter
 
-1. CLIENT REQUEST
-   │
-   │  POST /api/v1/interactions
-   │  {
-   │    "query": "Research quantum computing advances in 2024",
-   │    "config": {"max_iterations": 5}
-   │  }
-   │
-   ▼
-2. API GATEWAY
-   │
-   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-   │  │ Validate    │─▶│ Authenticate│─▶│ Rate Limit  │
-   │  │ Request     │  │ User        │  │ Check       │
-   │  └─────────────┘  └─────────────┘  └─────────────┘
-   │
-   ▼
-3. SESSION CREATION
-   │
-   │  ┌────────────────────────────────────────────┐
-   │  │ PostgreSQL: INSERT INTO research_sessions  │
-   │  │ Redis: SET drx:session:{id} (cache)        │
-   │  └────────────────────────────────────────────┘
-   │
-   │  Return: { "id": "int_abc123", "status": "queued" }
-   │
-   ▼
-4. ASYNC EXECUTION (Celery Worker)
-   │
-   │  ┌─────────────────────────────────────────────────────────────────┐
-   │  │                    LangGraph Execution                          │
-   │  │                                                                 │
-   │  │  State: AgentState                                              │
-   │  │  ┌─────────────────────────────────────────────────────────┐   │
-   │  │  │ messages, plan, findings, citations, synthesis, gaps... │   │
-   │  │  └─────────────────────────────────────────────────────────┘   │
-   │  │                           │                                     │
-   │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐           │
-   │  │  │ Planner │─▶│Searcher │─▶│ Reader  │─▶│Synthesizer          │
-   │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘           │
-   │  │                                              │                  │
-   │  │  Each agent:                                 │                  │
-   │  │  1. Policy check (firewall)                  ▼                  │
-   │  │  2. LLM call (OpenRouter)            ┌─────────┐               │
-   │  │  3. Tool invocations                 │ Critic  │               │
-   │  │  4. State update                     └────┬────┘               │
-   │  │  5. Checkpoint save                       │                    │
-   │  │  6. Event emission                        ▼                    │
-   │  │                                   ┌─────────────┐              │
-   │  │                                   │  Reporter   │              │
-   │  │                                   └─────────────┘              │
-   │  └─────────────────────────────────────────────────────────────────┘
-   │
-   ▼
-5. EVENT STREAMING (SSE)
-   │
-   │  GET /api/v1/interactions/{id}/stream
-   │
-   │  Events emitted:
-   │  ┌────────────────────────────────────────────────────┐
-   │  │ event: interaction.start                           │
-   │  │ event: thought_summary                             │
-   │  │ event: tool.use                                    │
-   │  │ event: content.delta                               │
-   │  │ event: checkpoint                                  │
-   │  │ event: interaction.complete                        │
-   │  └────────────────────────────────────────────────────┘
-   │
-   ▼
-6. FINAL OUTPUT
-   │
-   │  {
-   │    "id": "int_abc123",
-   │    "status": "completed",
-   │    "report": "# Research Report\n\n...",
-   │    "citations": [...],
-   │    "metrics": { "coverage": 0.92, "confidence": 0.88 }
-   │  }
-   │
-   ▼
-7. STORAGE & CLEANUP
-   │
-   │  ┌────────────────────────────────────────────────────┐
-   │  │ PostgreSQL: UPDATE research_sessions SET status    │
-   │  │ PostgreSQL: Store findings, citations              │
-   │  │ Redis: EXPIRE session cache                        │
-   │  │ Phoenix: Complete trace span                       │
-   │  └────────────────────────────────────────────────────┘
+    C->>API: POST /api/v1/interactions
+    API->>API: Validate & Authenticate
+    API->>DB: INSERT research_session
+    DB-->>API: session_id
+    API->>R: SET drx:session:{id}
+    API-->>C: 202 Accepted {id, status: queued}
+
+    Note over O,LLM: Async Worker Execution
+
+    O->>DB: Load session state
+
+    loop For each agent in DAG
+        O->>A: Run agent
+        A->>LLM: Generate completion
+        LLM-->>A: Response
+        A->>R: Emit SSE event
+        A-->>O: Updated state
+        O->>DB: Save checkpoint
+    end
+
+    O->>DB: UPDATE session status=completed
+    O->>R: PUBLISH complete event
+```
+
+### SSE Streaming Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as API Server
+    participant R as Redis
+    participant O as Orchestrator
+
+    C->>API: GET /stream
+    API->>R: SUBSCRIBE drx:events:{id}
+    API-->>C: SSE: connected
+
+    loop Event Stream
+        O->>R: PUBLISH event
+        R-->>API: event received
+        API-->>C: SSE: thought_summary
+        O->>R: PUBLISH event
+        R-->>API: event received
+        API-->>C: SSE: content.delta
+        O->>R: PUBLISH checkpoint
+        R-->>API: checkpoint received
+        API-->>C: SSE: checkpoint
+    end
+
+    O->>R: PUBLISH complete
+    R-->>API: complete received
+    API-->>C: SSE: interaction.complete
+    API-->>C: Connection closed
 ```
 
 ### Checkpoint & Resume Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           Checkpoint & Resume Flow                               │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph NormalExecution["Normal Execution"]
+        Node1["Node 1<br/>(Planner)"]
+        Node2["Node 2<br/>(Searcher)"]
+        Node3["Node 3<br/>(Reader)"]
 
-                    NORMAL EXECUTION
-                          │
-    ┌─────────────────────┼─────────────────────┐
-    │                     │                     │
-    ▼                     ▼                     ▼
-┌─────────┐         ┌─────────┐           ┌─────────┐
-│  Node 1 │────────▶│  Node 2 │──────────▶│  Node 3 │
-│(Planner)│         │(Searcher)│          │(Reader) │
-└────┬────┘         └────┬────┘           └────┬────┘
-     │                   │                     │
-     ▼                   ▼                     ▼
-┌─────────────────────────────────────────────────────┐
-│               AsyncPostgresSaver                     │
-│                                                      │
-│  Checkpoint saved after each node:                   │
-│  ┌────────────────────────────────────────────────┐ │
-│  │ checkpoint_id: "chk_001"                       │ │
-│  │ thread_id: "session_abc123"                    │ │
-│  │ state: { messages, plan, findings, ... }      │ │
-│  │ metadata: { node: "planner", timestamp: ... } │ │
-│  └────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
-                          │
-                          │ INTERRUPTION
-                          │ (error, timeout, pause)
-                          ▼
-               ┌────────────────────┐
-               │  Session Paused    │
-               │  State preserved   │
-               └────────────────────┘
-                          │
-                          │ RESUME REQUEST
-                          │ POST /interactions/{id}/resume?checkpoint=chk_002
-                          ▼
-┌─────────────────────────────────────────────────────┐
-│               Resume from Checkpoint                 │
-│                                                      │
-│  1. Load checkpoint state from PostgreSQL            │
-│  2. Reconstruct AgentState                           │
-│  3. Identify next node in DAG                        │
-│  4. Continue execution                               │
-└─────────────────────────────────────────────────────┘
-                          │
-                          ▼
-    ┌─────────────────────────────────────────┐
-    │                     │                   │
-    ▼                     ▼                   ▼
-┌─────────┐         ┌─────────┐         ┌─────────┐
-│  Node 3 │────────▶│  Node 4 │────────▶│  Node 5 │
-│(continue)│        │(Synthesize)│      │(Report) │
-└─────────┘         └─────────┘         └─────────┘
+        Node1 --> Node2 --> Node3
+    end
+
+    subgraph Checkpointing["AsyncPostgresSaver"]
+        CP["Checkpoint saved after each node:<br/>checkpoint_id<br/>thread_id<br/>state<br/>metadata"]
+    end
+
+    Node1 --> CP
+    Node2 --> CP
+    Node3 --> CP
+
+    CP --> Interruption["INTERRUPTION<br/>(error, timeout, pause)"]
+    Interruption --> Paused["Session Paused<br/>State preserved"]
+
+    Paused --> Resume["RESUME REQUEST<br/>POST /resume?checkpoint=chk_002"]
+
+    Resume --> LoadState["Resume from Checkpoint<br/>1. Load state from PostgreSQL<br/>2. Reconstruct AgentState<br/>3. Identify next node<br/>4. Continue execution"]
+
+    LoadState --> Node3Continue["Node 3<br/>(continue)"]
+    Node3Continue --> Node4["Node 4<br/>(Synthesize)"]
+    Node4 --> Node5["Node 5<br/>(Report)"]
 ```
 
 ---
@@ -636,99 +496,56 @@
 
 ### Authentication Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           Authentication Flow                                    │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    Request["Incoming Request<br/>Headers:<br/>Authorization: Bearer<br/>X-API-Key: drx_..."]
 
-                     ┌────────────────────────────┐
-                     │       Incoming Request     │
-                     │                            │
-                     │  Headers:                  │
-                     │  • Authorization: Bearer   │
-                     │  • X-API-Key: drx_...      │
-                     └─────────────┬──────────────┘
-                                   │
-                                   ▼
-                     ┌────────────────────────────┐
-                     │     Check Auth Headers     │
-                     └─────────────┬──────────────┘
-                                   │
-              ┌────────────────────┼────────────────────┐
-              │                    │                    │
-              ▼                    ▼                    ▼
-     ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
-     │  Bearer Token  │   │   API Key      │   │   No Auth      │
-     │                │   │                │   │                │
-     │ JWT Validation │   │ Key Lookup     │   │ Dev Mode Only  │
-     │ • Signature    │   │ • Redis cache  │   │ • is_dev check │
-     │ • Expiration   │   │ • DB fallback  │   │ • Default user │
-     │ • Claims       │   │ • Permissions  │   │                │
-     └───────┬────────┘   └───────┬────────┘   └───────┬────────┘
-             │                    │                    │
-             └────────────────────┴────────────────────┘
-                                   │
-                                   ▼
-                     ┌────────────────────────────┐
-                     │        User Object         │
-                     │                            │
-                     │  • id: str                 │
-                     │  • email: str | None       │
-                     │  • is_active: bool         │
-                     │  • is_admin: bool          │
-                     │  • rate_limit_tier: str    │
-                     └────────────────────────────┘
+    CheckHeaders["Check Auth Headers"]
+
+    BearerToken["Bearer Token<br/>JWT Validation<br/>Signature<br/>Expiration<br/>Claims"]
+    APIKey["API Key<br/>Key Lookup<br/>Redis cache<br/>DB fallback<br/>Permissions"]
+    NoAuth["No Auth<br/>Dev Mode Only<br/>is_dev check<br/>Default user"]
+
+    UserObject["User Object<br/>id: str<br/>email: str | None<br/>is_active: bool<br/>is_admin: bool<br/>rate_limit_tier: str"]
+
+    Request --> CheckHeaders
+    CheckHeaders --> BearerToken
+    CheckHeaders --> APIKey
+    CheckHeaders --> NoAuth
+
+    BearerToken --> UserObject
+    APIKey --> UserObject
+    NoAuth --> UserObject
 ```
 
 ### Rate Limiting Architecture
 
+```mermaid
+sequenceDiagram
+    participant Req as Request
+    participant RL as Rate Limiter
+    participant Redis as Redis
+
+    Req->>RL: Check Limit
+    RL->>Redis: ZREMRANGEBYSCORE (remove old)
+    RL->>Redis: ZCARD (count current window)
+    Redis-->>RL: current_count
+
+    alt count < limit
+        RL->>Redis: ZADD request, Set TTL
+        RL-->>Req: Allow request
+    else count >= limit
+        RL-->>Req: Return 429 + Retry-After
+    end
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         Rate Limiting Architecture                               │
-└─────────────────────────────────────────────────────────────────────────────────┘
 
-     Request                     Rate Limiter                    Redis Backend
-        │                             │                               │
-        │   Check Limit               │                               │
-        │────────────────────────────▶│                               │
-        │                             │   ZREMRANGEBYSCORE            │
-        │                             │──────────────────────────────▶│
-        │                             │   (remove old entries)        │
-        │                             │                               │
-        │                             │   ZCARD                       │
-        │                             │──────────────────────────────▶│
-        │                             │   (count current window)      │
-        │                             │                               │
-        │                             │◀──────────────────────────────│
-        │                             │   current_count               │
-        │                             │                               │
-        │                    ┌────────┴────────┐                      │
-        │                    │ count < limit ? │                      │
-        │                    └────────┬────────┘                      │
-        │                             │                               │
-        │             ┌───────────────┴───────────────┐               │
-        │             │                               │               │
-        │            YES                             NO               │
-        │             │                               │               │
-        │             ▼                               ▼               │
-        │   ┌─────────────────┐           ┌─────────────────┐        │
-        │   │ ZADD request    │           │ Return 429      │        │
-        │   │ Set TTL         │           │ Retry-After     │        │
-        │   │ Allow request   │           │ header          │        │
-        │   └─────────────────┘           └─────────────────┘        │
-        │             │                                               │
-        │◀────────────┴───────────────────────────────────────────────│
+**Rate Limit Tiers:**
 
-
-   Rate Limit Tiers:
-   ┌─────────────────────────────────────────────────────────────────┐
-   │  Tier      │  Requests/min  │  Requests/hour  │  Burst Limit   │
-   ├────────────┼────────────────┼─────────────────┼────────────────┤
-   │  standard  │      60        │     1,000       │      10        │
-   │  premium   │     300        │     5,000       │      50        │
-   │  unlimited │  10,000        │   100,000       │   1,000        │
-   └─────────────────────────────────────────────────────────────────┘
-```
+| Tier | Requests/min | Requests/hour | Burst Limit |
+|------|--------------|---------------|-------------|
+| standard | 60 | 1,000 | 10 |
+| premium | 300 | 5,000 | 50 |
+| unlimited | 10,000 | 100,000 | 1,000 |
 
 ---
 
@@ -736,91 +553,58 @@
 
 ### OpenRouter LLM Integration
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           OpenRouter Integration                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant Agent as DRX Agent
+    participant Client as OpenRouter Client
+    participant API as OpenRouter API
 
-     DRX Agent                  OpenRouter Client               OpenRouter API
-         │                            │                              │
-         │  generate(prompt, model)   │                              │
-         │───────────────────────────▶│                              │
-         │                            │                              │
-         │                            │   POST /api/v1/chat/completions
-         │                            │─────────────────────────────▶│
-         │                            │                              │
-         │                            │   Headers:                   │
-         │                            │   • Authorization: Bearer    │
-         │                            │   • HTTP-Referer: app-url    │
-         │                            │   • X-Title: DRX             │
-         │                            │                              │
-         │                            │   Body:                      │
-         │                            │   {                          │
-         │                            │     "model": "google/gemini.."│
-         │                            │     "messages": [...]        │
-         │                            │     "temperature": 0.7       │
-         │                            │     "max_tokens": 4096       │
-         │                            │   }                          │
-         │                            │                              │
-         │                            │◀─────────────────────────────│
-         │                            │   Streaming response         │
-         │                            │                              │
-         │◀───────────────────────────│   Parsed response            │
-         │                            │                              │
-
-
-   Supported Models:
-   ┌────────────────────────────────────────────────────────────────────────┐
-   │  Model ID                        │  Context  │  Use Case              │
-   ├──────────────────────────────────┼───────────┼────────────────────────┤
-   │  google/gemini-3-flash-preview   │   1M      │  Default, fast         │
-   │  google/gemini-3-pro-preview     │   1M      │  Complex reasoning     │
-   │  anthropic/claude-3.5-sonnet     │  200K     │  High quality          │
-   │  deepseek/deepseek-r1            │  128K     │  Reasoning tasks       │
-   │  openai/gpt-4o                   │  128K     │  General purpose       │
-   └────────────────────────────────────────────────────────────────────────┘
+    Agent->>Client: generate(prompt, model)
+    Client->>API: POST /api/v1/chat/completions
+    Note right of API: Headers:<br/>Authorization: Bearer<br/>HTTP-Referer: app-url<br/>X-Title: DRX
+    Note right of API: Body:<br/>model: google/gemini...<br/>messages: [...]<br/>temperature: 0.7<br/>max_tokens: 4096
+    API-->>Client: Streaming response
+    Client-->>Agent: Parsed response
 ```
 
-### Tavily Search Integration
+**Supported Models:**
 
+| Model ID | Context | Use Case |
+|----------|---------|----------|
+| google/gemini-3-flash-preview | 1M | Default, fast |
+| google/gemini-3-pro-preview | 1M | Complex reasoning |
+| anthropic/claude-3.5-sonnet | 200K | High quality |
+| deepseek/deepseek-r1 | 128K | Reasoning tasks |
+| openai/gpt-4o | 128K | General purpose |
+| openai/gpt-oss-20b:free | 131K | Free search model |
+
+### Web Search Integration
+
+```mermaid
+sequenceDiagram
+    participant Agent as Searcher Agent
+    participant Tool as OpenRouter Search
+    participant API as OpenRouter API
+
+    Agent->>Tool: search(query)
+    Tool->>API: POST /chat/completions
+    Note right of API: model: model:online<br/>plugins: [{id: "web"}]
+    API-->>Tool: {results: [...], annotations: [...]}
+    Tool-->>Agent: Parsed SearchResults
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Tavily Search Integration                             │
-└─────────────────────────────────────────────────────────────────────────────────┘
 
-     Searcher Agent              Tavily Tool                   Tavily API
-          │                          │                              │
-          │  search(query)           │                              │
-          │─────────────────────────▶│                              │
-          │                          │                              │
-          │                          │  POST /search                │
-          │                          │─────────────────────────────▶│
-          │                          │                              │
-          │                          │  {                           │
-          │                          │    "query": "...",           │
-          │                          │    "search_depth": "advanced"│
-          │                          │    "max_results": 10,        │
-          │                          │    "include_raw_content": true│
-          │                          │  }                           │
-          │                          │                              │
-          │                          │◀─────────────────────────────│
-          │                          │  { "results": [...] }        │
-          │                          │                              │
-          │◀─────────────────────────│                              │
-          │  Parsed SearchResults    │                              │
-
-
-   SearchResult Schema:
-   ┌────────────────────────────────────────────────────────────────┐
-   │  {                                                             │
-   │    "url": "https://...",                                       │
-   │    "title": "Article Title",                                   │
-   │    "content": "Extracted content...",                          │
-   │    "raw_content": "Full HTML...",                              │
-   │    "score": 0.95,                                              │
-   │    "published_date": "2024-01-15"                              │
-   │  }                                                             │
-   └────────────────────────────────────────────────────────────────┘
+**SearchResult Schema:**
+```json
+{
+  "url": "https://...",
+  "title": "Article Title",
+  "content": "Extracted content...",
+  "score": 0.95,
+  "metadata": {
+    "source": "openrouter",
+    "engine": "native"
+  }
+}
 ```
 
 ---
@@ -829,125 +613,109 @@
 
 ### Tracing Architecture
 
+```mermaid
+flowchart TB
+    subgraph Application["Application Layer"]
+        RootSpan["Create Root Span<br/>research_session"]
+
+        subgraph AgentExecution["Agent Execution"]
+            PlannerSpan["Child Span: planner"]
+            LLMSpan1["Child Span: llm_call"]
+            SearcherSpan["Child Span: searcher"]
+            ToolSpan["Child Span: tool_use"]
+        end
+    end
+
+    subgraph OTel["OpenTelemetry"]
+        Exporter["OTLP Exporter"]
+    end
+
+    subgraph Phoenix["Phoenix Collector"]
+        Storage["Phoenix Storage<br/>Traces<br/>Spans<br/>Metrics"]
+    end
+
+    RootSpan --> AgentExecution
+    AgentExecution --> Exporter
+    Exporter -->|"OTLP/gRPC"| Storage
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Tracing Architecture                                  │
-└─────────────────────────────────────────────────────────────────────────────────┘
 
-   Application Layer                 OpenTelemetry               Phoenix Collector
-         │                                │                            │
-         │                                │                            │
-   ┌─────┴─────┐                          │                            │
-   │  Request  │                          │                            │
-   │  Arrives  │                          │                            │
-   └─────┬─────┘                          │                            │
-         │                                │                            │
-         ▼                                │                            │
-   ┌───────────────────┐                  │                            │
-   │  Create Root Span │                  │                            │
-   │  "research_session"│                 │                            │
-   └─────────┬─────────┘                  │                            │
-             │                            │                            │
-             ▼                            │                            │
-   ┌───────────────────┐                  │                            │
-   │  Agent Execution  │                  │                            │
-   │                   │                  │                            │
-   │  ┌─────────────┐  │                  │                            │
-   │  │ Child Span  │  │   Export Span    │                            │
-   │  │ "planner"   │──┼─────────────────▶│                            │
-   │  └─────────────┘  │                  │                            │
-   │                   │                  │     OTLP/gRPC              │
-   │  ┌─────────────┐  │                  │────────────────────────────▶
-   │  │ Child Span  │  │                  │                            │
-   │  │ "llm_call"  │──┼─────────────────▶│                            │
-   │  └─────────────┘  │                  │                            │
-   │                   │                  │                            │
-   │  ┌─────────────┐  │                  │                            │
-   │  │ Child Span  │  │                  │                            │
-   │  │ "tool_use"  │──┼─────────────────▶│                            │
-   │  └─────────────┘  │                  │                            │
-   └───────────────────┘                  │                            │
-                                          │                            │
-                                          │                     ┌──────┴──────┐
-                                          │                     │   Phoenix   │
-                                          │                     │   Storage   │
-                                          │                     │             │
-                                          │                     │  • Traces   │
-                                          │                     │  • Spans    │
-                                          │                     │  • Metrics  │
-                                          │                     └─────────────┘
+**Span Hierarchy:**
 
+```mermaid
+flowchart TB
+    Root["research_session (root)"]
 
-   Span Hierarchy:
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  research_session (root)                                                     │
-   │  ├── planner_agent                                                          │
-   │  │   ├── llm_call (model: gemini-flash)                                     │
-   │  │   └── state_update                                                       │
-   │  ├── searcher_agent                                                         │
-   │  │   ├── llm_call (query expansion)                                         │
-   │  │   ├── tool_call (tavily_search)                                          │
-   │  │   └── tool_call (rag_retrieve)                                           │
-   │  ├── reader_agent[0]                                                        │
-   │  │   ├── tool_call (html_parse)                                             │
-   │  │   └── llm_call (extraction)                                              │
-   │  ├── reader_agent[1]                                                        │
-   │  │   └── ...                                                                │
-   │  ├── synthesizer_agent                                                      │
-   │  │   └── llm_call (synthesis)                                               │
-   │  ├── critic_agent                                                           │
-   │  │   └── llm_call (evaluation)                                              │
-   │  └── reporter_agent                                                         │
-   │      └── llm_call (report generation)                                       │
-   └─────────────────────────────────────────────────────────────────────────────┘
+    Planner["planner_agent"]
+    PlannerLLM["llm_call (gemini-flash)"]
+    PlannerState["state_update"]
+
+    Searcher["searcher_agent"]
+    SearcherLLM["llm_call (query expansion)"]
+    SearcherTool1["tool_call (web_search)"]
+    SearcherTool2["tool_call (rag_retrieve)"]
+
+    Reader0["reader_agent[0]"]
+    Reader0Tool["tool_call (html_parse)"]
+    Reader0LLM["llm_call (extraction)"]
+
+    Reader1["reader_agent[1]"]
+
+    Synthesizer["synthesizer_agent"]
+    SynthesizerLLM["llm_call (synthesis)"]
+
+    Critic["critic_agent"]
+    CriticLLM["llm_call (evaluation)"]
+
+    Reporter["reporter_agent"]
+    ReporterLLM["llm_call (report generation)"]
+
+    Root --> Planner
+    Planner --> PlannerLLM
+    Planner --> PlannerState
+
+    Root --> Searcher
+    Searcher --> SearcherLLM
+    Searcher --> SearcherTool1
+    Searcher --> SearcherTool2
+
+    Root --> Reader0
+    Reader0 --> Reader0Tool
+    Reader0 --> Reader0LLM
+
+    Root --> Reader1
+    Root --> Synthesizer
+    Synthesizer --> SynthesizerLLM
+
+    Root --> Critic
+    Critic --> CriticLLM
+
+    Root --> Reporter
+    Reporter --> ReporterLLM
 ```
 
 ### Metrics Collection
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Metrics Collection                                    │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph RealTimeRedis["Real-time Metrics (Redis)"]
+        AgentHealth["drx:agent:{id}:health<br/>status: healthy|degraded<br/>last_check: timestamp<br/>failure_count: 0"]
 
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │                          Real-time Metrics (Redis)                           │
-   │                                                                              │
-   │  Agent Health:                        Rate Metrics:                          │
-   │  ┌──────────────────────────────┐    ┌──────────────────────────────┐       │
-   │  │ drx:agent:{id}:health        │    │ drx:agent:{id}:metrics       │       │
-   │  │ • status: healthy|degraded   │    │ • tokens_1m: 45000           │       │
-   │  │ • last_check: timestamp      │    │ • tokens_5m: 180000          │       │
-   │  │ • failure_count: 0           │    │ • latency_p50: 1200          │       │
-   │  └──────────────────────────────┘    │ • latency_p99: 4500          │       │
-   │                                       │ • error_rate: 0.02           │       │
-   │  Circuit Status:                      └──────────────────────────────┘       │
-   │  ┌──────────────────────────────┐                                           │
-   │  │ drx:agent:{id}:circuit       │    Invocations (Sorted Set):              │
-   │  │ • state: closed              │    ┌──────────────────────────────┐       │
-   │  │ • opened_at: null            │    │ drx:agent:{id}:invocations   │       │
-   │  └──────────────────────────────┘    │ • (timestamp, {tokens, ms})  │       │
-   │                                       └──────────────────────────────┘       │
-   └─────────────────────────────────────────────────────────────────────────────┘
+        RateMetrics["drx:agent:{id}:metrics<br/>tokens_1m: 45000<br/>tokens_5m: 180000<br/>latency_p50: 1200<br/>latency_p99: 4500<br/>error_rate: 0.02"]
 
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │                        Persistent Metrics (PostgreSQL)                       │
-   │                                                                              │
-   │  research_sessions:                   tool_invocations:                      │
-   │  ┌──────────────────────────────┐    ┌──────────────────────────────┐       │
-   │  │ • tokens_used: 125000        │    │ • tool_name: tavily_search   │       │
-   │  │ • cost_usd: 0.0125           │    │ • latency_ms: 1250           │       │
-   │  │ • latency_ms: 45000          │    │ • tokens_used: 500           │       │
-   │  │ • iteration_count: 3         │    │ • success: true              │       │
-   │  └──────────────────────────────┘    └──────────────────────────────┘       │
-   │                                                                              │
-   │  agent_invocations:                   policy_violations:                     │
-   │  ┌──────────────────────────────┐    ┌──────────────────────────────┐       │
-   │  │ • agent_type: searcher       │    │ • violation_type: domain     │       │
-   │  │ • input_tokens: 2500         │    │ • severity: warning          │       │
-   │  │ • output_tokens: 1500        │    │ • blocked: true              │       │
-   │  │ • latency_ms: 3200           │    │ • agent_id: searcher_v1      │       │
-   │  └──────────────────────────────┘    └──────────────────────────────┘       │
-   └─────────────────────────────────────────────────────────────────────────────┘
+        CircuitStatus["drx:agent:{id}:circuit<br/>state: closed<br/>opened_at: null"]
+
+        Invocations["drx:agent:{id}:invocations<br/>(timestamp, {tokens, ms})"]
+    end
+
+    subgraph PersistentPostgres["Persistent Metrics (PostgreSQL)"]
+        Sessions["research_sessions<br/>tokens_used: 125000<br/>cost_usd: 0.0125<br/>latency_ms: 45000<br/>iteration_count: 3"]
+
+        ToolInvocations["tool_invocations<br/>tool_name: search<br/>latency_ms: 1250<br/>tokens_used: 500<br/>success: true"]
+
+        AgentInvocations["agent_invocations<br/>agent_type: searcher<br/>input_tokens: 2500<br/>output_tokens: 1500<br/>latency_ms: 3200"]
+
+        Violations["policy_violations<br/>violation_type: domain<br/>severity: warning<br/>blocked: true<br/>agent_id: searcher_v1"]
+    end
 ```
 
 ---
@@ -956,150 +724,71 @@
 
 ### Evaluation Workflow
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Evaluation Workflow                                   │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Trigger["CI/CD Pipeline Trigger"]
+        GHA["GitHub Actions<br/>on: push [main, develop]<br/>on: pull_request [main]"]
+    end
 
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │                          CI/CD Pipeline Trigger                              │
-   │                                                                              │
-   │  GitHub Actions                                                              │
-   │  ┌───────────────────────────────────────────────────────────────────────┐  │
-   │  │  on:                                                                   │  │
-   │  │    push: [main, develop]                                               │  │
-   │  │    pull_request: [main]                                                │  │
-   │  └───────────────────────────────────────────────────────────────────────┘  │
-   └─────────────────────────────────────────────────────────────────────────────┘
-                                         │
-                                         ▼
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │                           Test Execution                                     │
-   │                                                                              │
-   │  ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐       │
-   │  │   Unit Tests      │  │ Integration Tests │  │  Evaluation Tests │       │
-   │  │                   │  │                   │  │                   │       │
-   │  │ pytest tests/unit │  │pytest tests/integ │  │pytest ci/eval     │       │
-   │  └─────────┬─────────┘  └─────────┬─────────┘  └─────────┬─────────┘       │
-   │            │                      │                      │                  │
-   │            └──────────────────────┴──────────────────────┘                  │
-   │                                   │                                          │
-   └───────────────────────────────────┼──────────────────────────────────────────┘
-                                       │
-                                       ▼
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │                         Evaluation Framework                                 │
-   │                                                                              │
-   │  ┌─────────────────────────────────────────────────────────────────────┐   │
-   │  │                         DeepEval Metrics                             │   │
-   │  │                                                                      │   │
-   │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │   │
-   │  │  │ Faithfulness │  │   Answer     │  │ Hallucination│               │   │
-   │  │  │    Metric    │  │  Relevancy   │  │    Metric    │               │   │
-   │  │  │              │  │   Metric     │  │              │               │   │
-   │  │  │ Threshold:   │  │ Threshold:   │  │ Threshold:   │               │   │
-   │  │  │   >= 0.8     │  │   >= 0.7     │  │   <= 0.2     │               │   │
-   │  │  └──────────────┘  └──────────────┘  └──────────────┘               │   │
-   │  └─────────────────────────────────────────────────────────────────────┘   │
-   │                                                                              │
-   │  ┌─────────────────────────────────────────────────────────────────────┐   │
-   │  │                          Ragas Metrics                               │   │
-   │  │                                                                      │   │
-   │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │   │
-   │  │  │   Context    │  │   Context    │  │   Answer     │               │   │
-   │  │  │  Precision   │  │   Recall     │  │ Correctness  │               │   │
-   │  │  │              │  │              │  │              │               │   │
-   │  │  │ Threshold:   │  │ Threshold:   │  │ Threshold:   │               │   │
-   │  │  │   >= 0.6     │  │   >= 0.6     │  │   >= 0.7     │               │   │
-   │  │  └──────────────┘  └──────────────┘  └──────────────┘               │   │
-   │  └─────────────────────────────────────────────────────────────────────┘   │
-   │                                                                              │
-   │  ┌─────────────────────────────────────────────────────────────────────┐   │
-   │  │                      Metadata Compliance                             │   │
-   │  │                                                                      │   │
-   │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │   │
-   │  │  │   Budget     │  │   Domain     │  │  Rate Limit  │               │   │
-   │  │  │ Compliance   │  │ Compliance   │  │  Compliance  │               │   │
-   │  │  │              │  │              │  │              │               │   │
-   │  │  │ spend <=     │  │ no blocked   │  │ within       │               │   │
-   │  │  │ max_budget   │  │ domains      │  │ rpm/tpm      │               │   │
-   │  │  └──────────────┘  └──────────────┘  └──────────────┘               │   │
-   │  └─────────────────────────────────────────────────────────────────────┘   │
-   └─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │                            Gate Decision                                     │
-   │                                                                              │
-   │  ┌───────────────────────────────────────────────────────────────────────┐  │
-   │  │                        Threshold Checks                                │  │
-   │  │                                                                        │  │
-   │  │   Hard Gates (block deployment):        Soft Gates (warn only):        │  │
-   │  │   • Faithfulness >= 0.8                 • Answer Relevancy >= 0.7      │  │
-   │  │   • Hallucination <= 0.2                • Context Precision >= 0.6     │  │
-   │  │   • Policy Violations == 0                                             │  │
-   │  │   • Task Completion >= 0.7                                             │  │
-   │  └───────────────────────────────────────────────────────────────────────┘  │
-   │                                                                              │
-   │                         ┌─────────────────────┐                             │
-   │                         │   All Gates Pass?   │                             │
-   │                         └──────────┬──────────┘                             │
-   │                                    │                                         │
-   │                    ┌───────────────┴───────────────┐                        │
-   │                    │                               │                         │
-   │                   YES                             NO                         │
-   │                    │                               │                         │
-   │                    ▼                               ▼                         │
-   │           ┌────────────────┐             ┌────────────────┐                 │
-   │           │ Deploy Allowed │             │ Deploy Blocked │                 │
-   │           └────────────────┘             └────────────────┘                 │
-   └─────────────────────────────────────────────────────────────────────────────┘
+    subgraph Tests["Test Execution"]
+        Unit["Unit Tests<br/>pytest tests/unit"]
+        Integration["Integration Tests<br/>pytest tests/integ"]
+        Eval["Evaluation Tests<br/>pytest ci/eval"]
+    end
+
+    subgraph EvalFramework["Evaluation Framework"]
+        subgraph DeepEval["DeepEval Metrics"]
+            Faithfulness["Faithfulness<br/>Threshold: >= 0.8"]
+            AnswerRelevancy["Answer Relevancy<br/>Threshold: >= 0.7"]
+            Hallucination["Hallucination<br/>Threshold: <= 0.2"]
+        end
+
+        subgraph Ragas["Ragas Metrics"]
+            ContextPrecision["Context Precision<br/>Threshold: >= 0.6"]
+            ContextRecall["Context Recall<br/>Threshold: >= 0.6"]
+            AnswerCorrectness["Answer Correctness<br/>Threshold: >= 0.7"]
+        end
+
+        subgraph MetadataCompliance["Metadata Compliance"]
+            BudgetCheck["Budget Compliance<br/>spend <= max_budget"]
+            DomainCheck["Domain Compliance<br/>no blocked domains"]
+            RateLimitCheck["Rate Limit Compliance<br/>within rpm/tpm"]
+        end
+    end
+
+    subgraph Gate["Gate Decision"]
+        HardGates["Hard Gates (block):<br/>Faithfulness >= 0.8<br/>Hallucination <= 0.2<br/>Policy Violations == 0<br/>Task Completion >= 0.7"]
+        SoftGates["Soft Gates (warn):<br/>Answer Relevancy >= 0.7<br/>Context Precision >= 0.6"]
+
+        Decision{"All Gates Pass?"}
+        DeployAllowed["Deploy Allowed"]
+        DeployBlocked["Deploy Blocked"]
+    end
+
+    Trigger --> Tests
+    Tests --> EvalFramework
+    EvalFramework --> Gate
+    HardGates --> Decision
+    SoftGates --> Decision
+    Decision -->|YES| DeployAllowed
+    Decision -->|NO| DeployBlocked
 ```
 
-### Phoenix Integration
+### Phoenix Dashboard
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           Phoenix Dashboard                                      │
-└─────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph PhoenixUI["Phoenix UI (http://localhost:6006)"]
+        subgraph TraceExplorer["Trace Explorer"]
+            SessionInfo["Session: int_abc123<br/>Duration: 45.2s<br/>Tokens: 125,000<br/>Cost: $0.0125"]
 
-   ┌─────────────────────────────────────────────────────────────────────────────┐
-   │  Phoenix UI (http://localhost:6006)                                          │
-   │                                                                              │
-   │  ┌─────────────────────────────────────────────────────────────────────┐   │
-   │  │                        Trace Explorer                                │   │
-   │  │                                                                      │   │
-   │  │  Session: int_abc123                                                 │   │
-   │  │  Duration: 45.2s                                                     │   │
-   │  │  Tokens: 125,000                                                     │   │
-   │  │  Cost: $0.0125                                                       │   │
-   │  │                                                                      │   │
-   │  │  ┌──────────────────────────────────────────────────────────────┐   │   │
-   │  │  │  Timeline View                                               │   │   │
-   │  │  │                                                              │   │   │
-   │  │  │  ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ planner (8.2s)    │   │   │
-   │  │  │          ████████████░░░░░░░░░░░░░░░░░░░░ searcher (12.1s)  │   │   │
-   │  │  │                      ██████████░░░░░░░░░░ reader[0] (9.5s)  │   │   │
-   │  │  │                      ██████░░░░░░░░░░░░░░ reader[1] (6.2s)  │   │   │
-   │  │  │                                ████████░░ synthesizer (7.8s)│   │   │
-   │  │  │                                        ██ critic (2.1s)     │   │   │
-   │  │  │                                          ████ reporter (4.3s)   │   │
-   │  │  └──────────────────────────────────────────────────────────────┘   │   │
-   │  └─────────────────────────────────────────────────────────────────────┘   │
-   │                                                                              │
-   │  ┌─────────────────────────────────────────────────────────────────────┐   │
-   │  │                       Evaluation Results                             │   │
-   │  │                                                                      │   │
-   │  │  ┌────────────────┬──────────┬────────────┐                         │   │
-   │  │  │    Metric      │  Score   │  Threshold │                         │   │
-   │  │  ├────────────────┼──────────┼────────────┤                         │   │
-   │  │  │ Faithfulness   │   0.92   │   >= 0.8   │ ✅                      │   │
-   │  │  │ Hallucination  │   0.08   │   <= 0.2   │ ✅                      │   │
-   │  │  │ Relevancy      │   0.88   │   >= 0.7   │ ✅                      │   │
-   │  │  │ Completeness   │   0.85   │   >= 0.7   │ ✅                      │   │
-   │  │  └────────────────┴──────────┴────────────┘                         │   │
-   │  └─────────────────────────────────────────────────────────────────────┘   │
-   └─────────────────────────────────────────────────────────────────────────────┘
+            Timeline["Timeline View<br/>planner (8.2s)<br/>searcher (12.1s)<br/>reader[0] (9.5s)<br/>reader[1] (6.2s)<br/>synthesizer (7.8s)<br/>critic (2.1s)<br/>reporter (4.3s)"]
+        end
+
+        subgraph EvalResults["Evaluation Results"]
+            Metrics["Metric | Score | Threshold<br/>Faithfulness | 0.92 | >= 0.8<br/>Hallucination | 0.08 | <= 0.2<br/>Relevancy | 0.88 | >= 0.7<br/>Completeness | 0.85 | >= 0.7"]
+        end
+    end
 ```
 
 ---
@@ -1118,7 +807,7 @@
 | **Cache** | Redis | 7+ | State, rate limiting |
 | **Queue** | Celery | 5.4+ | Async task execution |
 | **LLM Gateway** | OpenRouter | - | Multi-model access |
-| **Search** | Tavily | - | Web search |
+| **Search** | OpenRouter Native | - | Web search (free) |
 | **Observability** | Phoenix | 12+ | Tracing, eval |
 | **Telemetry** | OpenTelemetry | 1.28+ | Distributed tracing |
 | **Eval** | DeepEval | 1.0+ | LLM evaluation |
