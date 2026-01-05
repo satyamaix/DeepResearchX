@@ -53,7 +53,8 @@ CREATE TYPE agent_type AS ENUM (
     'reasoner',
     'writer',
     'critic',
-    'synthesizer'
+    'synthesizer',
+    'reporter'
 );
 
 -- Step types for research workflow

@@ -12,17 +12,16 @@ import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, Any, AsyncGenerator
+from typing import Annotated, Any, AsyncGenerator
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from redis.asyncio import ConnectionPool as RedisConnectionPool
 from redis.asyncio import Redis
 
+from psycopg import AsyncConnection
+
 from src.config import Settings, get_settings
 from src.db.connection import get_async_connection, get_async_pool
-
-if TYPE_CHECKING:
-    from psycopg import AsyncConnection
 
 logger = logging.getLogger(__name__)
 
