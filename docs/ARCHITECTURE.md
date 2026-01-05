@@ -773,8 +773,8 @@
    ┌────────────────────────────────────────────────────────────────────────┐
    │  Model ID                        │  Context  │  Use Case              │
    ├──────────────────────────────────┼───────────┼────────────────────────┤
-   │  google/gemini-2.0-flash-exp     │   1M      │  Default, fast         │
-   │  google/gemini-2.5-pro-preview   │   1M      │  Complex reasoning     │
+   │  google/gemini-3-flash-preview   │   1M      │  Default, fast         │
+   │  google/gemini-3-pro-preview     │   1M      │  Complex reasoning     │
    │  anthropic/claude-3.5-sonnet     │  200K     │  High quality          │
    │  deepseek/deepseek-r1            │  128K     │  Reasoning tasks       │
    │  openai/gpt-4o                   │  128K     │  General purpose       │

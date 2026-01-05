@@ -19,7 +19,7 @@ Example:
     openrouter = await get_openrouter_client()
     response = await openrouter.chat_completion(
         messages=[{"role": "user", "content": "Hello!"}],
-        model="google/gemini-2.5-flash-preview"
+        model="google/gemini-3-flash-preview"
     )
     print(response.content)
     ```

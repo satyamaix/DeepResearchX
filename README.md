@@ -122,7 +122,7 @@ Enterprise-grade reliability features:
 Use any LLM without code changes:
 ```env
 OPENROUTER_API_KEY=sk-or-...
-DEFAULT_MODEL=google/gemini-2.0-flash-exp
+DEFAULT_MODEL=google/gemini-3-flash-preview
 # or anthropic/claude-3.5-sonnet, deepseek/deepseek-r1, etc.
 ```
 
@@ -282,7 +282,7 @@ REDIS_URL=redis://localhost:6379       # Redis connection
 
 # Web Search (Native - No Extra Cost)
 SEARCH_ENGINE=native                   # native, exa, or auto
-SEARCH_MODEL=openai/gpt-4o-mini        # Must support native search
+SEARCH_MODEL=google/gemini-3-flash-preview  # Uses Exa search backend
 SEARCH_MAX_RESULTS=5                   # Results per query
 
 # Optional - Tavily Fallback
@@ -294,7 +294,7 @@ PHOENIX_COLLECTOR_ENDPOINT=http://localhost:4317
 PHOENIX_PROJECT_NAME=drx-research
 
 # Optional - Model Selection
-DEFAULT_MODEL=google/gemini-2.0-flash-exp
+DEFAULT_MODEL=google/gemini-3-flash-preview
 REASONING_MODEL=deepseek/deepseek-r1
 
 # Optional - Limits

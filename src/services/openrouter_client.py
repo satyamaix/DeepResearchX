@@ -115,21 +115,21 @@ ModelConfig = LLMModelConfig
 
 # Pre-configured model configurations
 MODELS: dict[str, LLMModelConfig] = {
-    "google/gemini-2.5-flash-preview": LLMModelConfig(
-        model_id="google/gemini-2.5-flash-preview",
+    "google/gemini-3-flash-preview": LLMModelConfig(
+        model_id="google/gemini-3-flash-preview",
         max_tokens=65536,
-        context_length=1000000,
+        context_length=1048576,  # 1M tokens
         supports_vision=True,
-        cost_per_million_input=0.15,
-        cost_per_million_output=0.6,
+        cost_per_million_input=0.5,
+        cost_per_million_output=3.0,
     ),
-    "google/gemini-2.5-pro-preview": LLMModelConfig(
-        model_id="google/gemini-2.5-pro-preview",
+    "google/gemini-3-pro-preview": LLMModelConfig(
+        model_id="google/gemini-3-pro-preview",
         max_tokens=65536,
-        context_length=1000000,
+        context_length=1048576,
         supports_vision=True,
-        cost_per_million_input=1.25,
-        cost_per_million_output=10.0,
+        cost_per_million_input=2.5,
+        cost_per_million_output=15.0,
     ),
     "deepseek/deepseek-r1": LLMModelConfig(
         model_id="deepseek/deepseek-r1",

@@ -374,7 +374,7 @@ def mock_llm_response() -> dict[str, Any]:
         "id": "mock-response-001",
         "object": "chat.completion",
         "created": int(datetime.utcnow().timestamp()),
-        "model": "google/gemini-2.5-flash-preview",
+        "model": "google/gemini-3-flash-preview",
         "choices": [
             {
                 "index": 0,

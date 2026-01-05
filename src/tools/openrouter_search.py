@@ -89,7 +89,7 @@ class OpenRouterSearchTool(SearchTool):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "openai/gpt-4o-mini",  # Default to native-capable model
+        model: str = "google/gemini-3-flash-preview",  # Default model (uses Exa search)
         engine: str | None = SEARCH_ENGINE_NATIVE,  # Prefer native search
         rate_limiter: RateLimiter | None = None,
         timeout: float = 60.0,
@@ -646,7 +646,7 @@ class OpenRouterClient:
     async def chat_completion_with_search(
         self,
         messages: list[dict],
-        model: str = "google/gemini-2.0-flash-001",
+        model: str = "google/gemini-3-flash-preview",
         max_results: int = 5
     ) -> dict:
         """

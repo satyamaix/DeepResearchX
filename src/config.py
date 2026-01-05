@@ -205,7 +205,7 @@ class Settings(BaseSettings):
 
     # Model configuration
     DEFAULT_MODEL: str = Field(
-        default="google/gemini-2.0-flash-001",
+        default="google/gemini-3-flash-preview",
         description="Default model for general tasks",
     )
 
@@ -246,10 +246,10 @@ class Settings(BaseSettings):
     )
 
     SEARCH_MODEL: str = Field(
-        default="openai/gpt-4o-mini",
+        default="google/gemini-3-flash-preview",
         description=(
-            "Model for web search. For native search, use models from "
-            "Anthropic, OpenAI, Perplexity, or xAI."
+            "Model for web search. Uses Exa search backend. "
+            "For free native search, use models from Anthropic, OpenAI, Perplexity, or xAI."
         ),
     )
 

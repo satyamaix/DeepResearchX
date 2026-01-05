@@ -905,7 +905,7 @@ Example Response:
         "sequence_num": 1,
         "event_type": "llm_call",
         "event_data": {
-          "model": "google/gemini-2.0-flash-exp",
+          "model": "google/gemini-3-flash-preview",
           "input_tokens": 1500,
           "output_tokens": 800,
           "request": {...},
@@ -1266,7 +1266,7 @@ OPENROUTER_API_KEY: string (required)
 OPENROUTER_BASE_URL: string
   default: https://openrouter.ai/api/v1
 DEFAULT_MODEL: string
-  default: google/gemini-2.0-flash-exp
+  default: google/gemini-3-flash-preview
 REASONING_MODEL: string
   default: deepseek/deepseek-r1
 
