@@ -56,8 +56,9 @@ NATIVE_SEARCH_MODELS = {
     "openai/gpt-4o",
     "openai/gpt-4o-mini",
     "openai/gpt-4-turbo",
-    "openai/o1",
+    "openai/gpt-o1",
     "openai/o1-mini",
+    "openai/gpt-oss-20b:free",  # Free model with native search support
     "perplexity/llama-3.1-sonar-small-128k-online",
     "perplexity/llama-3.1-sonar-large-128k-online",
     "perplexity/llama-3.1-sonar-huge-128k-online",
@@ -89,7 +90,7 @@ class OpenRouterSearchTool(SearchTool):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "google/gemini-3-flash-preview",  # Default model (uses Exa search)
+        model: str = "openai/gpt-oss-20b:free",  # Free model with native search support
         engine: str | None = SEARCH_ENGINE_NATIVE,  # Prefer native search
         rate_limiter: RateLimiter | None = None,
         timeout: float = 60.0,
@@ -646,7 +647,7 @@ class OpenRouterClient:
     async def chat_completion_with_search(
         self,
         messages: list[dict],
-        model: str = "google/gemini-3-flash-preview",
+        model: str = "openai/gpt-oss-20b:free",
         max_results: int = 5
     ) -> dict:
         """

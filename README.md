@@ -282,7 +282,7 @@ REDIS_URL=redis://localhost:6379       # Redis connection
 
 # Web Search (Native - No Extra Cost)
 SEARCH_ENGINE=native                   # native, exa, or auto
-SEARCH_MODEL=google/gemini-3-flash-preview  # Uses Exa search backend
+SEARCH_MODEL=openai/gpt-oss-20b:free   # Free model with native search
 SEARCH_MAX_RESULTS=5                   # Results per query
 
 # Optional - Tavily Fallback
@@ -309,7 +309,7 @@ DRX uses OpenRouter's **native web search** by default, which has no additional 
 
 | Provider | Models |
 |----------|--------|
-| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o1-mini |
+| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o1-mini, gpt-oss-20b:free |
 | **Anthropic** | claude-3.5-sonnet, claude-3-opus, claude-3-haiku |
 | **Perplexity** | llama-3.1-sonar-* (online variants) |
 | **xAI** | grok-2, grok-beta |
