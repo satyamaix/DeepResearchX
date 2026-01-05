@@ -280,9 +280,9 @@ OPENROUTER_API_KEY=sk-or-v1-...        # LLM API access
 DATABASE_URL=postgresql://...           # PostgreSQL connection
 REDIS_URL=redis://localhost:6379       # Redis connection
 
-# Web Search (Native - No Extra Cost)
+# Web Search (OpenRouter :online variant)
 SEARCH_ENGINE=native                   # native, exa, or auto
-SEARCH_MODEL=openai/gpt-oss-20b:free   # Free model with native search
+SEARCH_MODEL=google/gemini-3-flash-preview  # Any model + :online suffix
 SEARCH_MAX_RESULTS=5                   # Results per query
 
 # Optional - Tavily Fallback
@@ -303,18 +303,25 @@ TOKEN_BUDGET=100000                    # Max tokens per session
 DEFAULT_RATE_LIMIT_RPM=60             # Requests per minute
 ```
 
-### Native Web Search
+### Web Search with :online Variant
 
-DRX uses OpenRouter's **native web search** by default, which has no additional per-search cost (included in token pricing). Native search is available for:
+DRX uses OpenRouter's **:online model variant** for web search. Any model can use the `:online` suffix to enable real-time web search:
 
-| Provider | Models |
-|----------|--------|
-| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o1-mini, gpt-oss-20b:free |
-| **Anthropic** | claude-3.5-sonnet, claude-3-opus, claude-3-haiku |
-| **Perplexity** | llama-3.1-sonar-* (online variants) |
-| **xAI** | grok-2, grok-beta |
+```json
+{
+  "model": "google/gemini-3-flash-preview:online"
+}
+```
 
-For other models, Exa search is used automatically ($0.004/result).
+This is equivalent to using the web plugin explicitly:
+```json
+{
+  "model": "google/gemini-3-flash-preview",
+  "plugins": [{"id": "web"}]
+}
+```
+
+The default search model is `google/gemini-3-flash-preview` which provides excellent speed and quality for research queries.
 
 ### Agent Manifest
 

@@ -246,10 +246,10 @@ class Settings(BaseSettings):
     )
 
     SEARCH_MODEL: str = Field(
-        default="openai/gpt-oss-20b:free",
+        default="google/gemini-3-flash-preview",
         description=(
-            "Model for web search. Default uses free OpenAI model with native search. "
-            "Native search (free) available for Anthropic, OpenAI, Perplexity, xAI models."
+            "Model for web search. Add :online suffix for real-time web search. "
+            "Any model can use :online variant for web search capability."
         ),
     )
 

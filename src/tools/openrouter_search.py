@@ -1,18 +1,17 @@
 """
 OpenRouter Web Search Tool for DRX Deep Research system.
 
-Provides web search capabilities using OpenRouter's native web search plugin.
-Native search is available for Anthropic, OpenAI, Perplexity, and xAI models,
-providing direct search integration without additional third-party costs.
+Provides web search capabilities using OpenRouter's :online model variant.
+Any model can use the :online suffix to enable real-time web search,
+e.g., "google/gemini-3-flash-preview:online".
 
 Features:
-- Native web search via OpenRouter chat completion with :online plugin
+- Web search via :online model variant (works with any model)
 - Citation extraction from annotations (url_citation format)
-- Support for native engine (preferred) and exa fallback
 - Response parsing into standardized SearchResult format
-- Cost tracking based on provider pass-through pricing
+- Cost tracking based on provider pricing
 
-Reference: https://openrouter.ai/docs/guides/features/plugins/web-search
+Reference: https://openrouter.ai/docs/guides/routing/model-variants/online
 """
 
 from __future__ import annotations
@@ -90,7 +89,7 @@ class OpenRouterSearchTool(SearchTool):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "openai/gpt-oss-20b:free",  # Free model with native search support
+        model: str = "google/gemini-3-flash-preview",  # Gemini Flash with :online for web search
         engine: str | None = SEARCH_ENGINE_NATIVE,  # Prefer native search
         rate_limiter: RateLimiter | None = None,
         timeout: float = 60.0,
@@ -647,7 +646,7 @@ class OpenRouterClient:
     async def chat_completion_with_search(
         self,
         messages: list[dict],
-        model: str = "openai/gpt-oss-20b:free",
+        model: str = "google/gemini-3-flash-preview",
         max_results: int = 5
     ) -> dict:
         """
