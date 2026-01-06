@@ -25,7 +25,7 @@ from fastapi import (
     Response,
     status,
 )
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.api.dependencies import (
     CurrentUserDep,
@@ -143,7 +143,7 @@ class ResearchRequest(BaseModel):
         ...,
         min_length=10,
         max_length=10000,
-        description="Research query or question",
+        description="Research query or question. Can also be provided as 'query' for backward compatibility.",
     )
     steerability: SteerabilityConfig | None = Field(
         default=None,
@@ -153,6 +153,16 @@ class ResearchRequest(BaseModel):
         default=None,
         description="Research configuration",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_query_as_input(cls, data: Any) -> Any:
+        """Accept 'query' as an alias for 'input' for backward compatibility."""
+        if isinstance(data, dict):
+            # If 'query' is provided but 'input' is not, use 'query' as 'input'
+            if "query" in data and "input" not in data:
+                data["input"] = data.pop("query")
+        return data
 
     @field_validator("input")
     @classmethod
