@@ -1,71 +1,9 @@
 /* ============================================================================
    DRX Deep Research - Ultra-Lightweight Frontend Styles
+
+   NOTE: CSS Custom Properties are defined in variables.css
+   This file uses the centralized design tokens for theming support.
    ============================================================================ */
-
-/* CSS Custom Properties (Theme Variables) */
-:root {
-    /* Colors - Dark Theme (Default) */
-    --bg-primary: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-tertiary: #21262d;
-    --bg-hover: #30363d;
-    --bg-active: #484f58;
-
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --text-muted: #6e7681;
-    --text-link: #58a6ff;
-
-    --border-color: #30363d;
-    --border-hover: #484f58;
-
-    --accent-primary: #238636;
-    --accent-hover: #2ea043;
-    --accent-blue: #1f6feb;
-    --accent-purple: #8957e5;
-    --accent-orange: #d29922;
-    --accent-red: #f85149;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-
-    /* Layout */
-    --sidebar-width: 280px;
-    --header-height: 56px;
-    --input-height: 120px;
-    --border-radius: 8px;
-    --border-radius-lg: 12px;
-
-    /* Typography */
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-
-    /* Transitions */
-    --transition-fast: 0.15s ease;
-    --transition-normal: 0.25s ease;
-}
-
-/* Light Theme */
-[data-theme="light"] {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f6f8fa;
-    --bg-tertiary: #eaeef2;
-    --bg-hover: #d8dee4;
-    --bg-active: #c0c7cf;
-
-    --text-primary: #1f2328;
-    --text-secondary: #57606a;
-    --text-muted: #8c959f;
-    --text-link: #0969da;
-
-    --border-color: #d0d7de;
-    --border-hover: #8c959f;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
-}
 
 /* ============================================================================
    Reset & Base Styles
@@ -114,8 +52,8 @@ input, select, textarea {
     color: inherit;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: 8px 12px;
+    border-radius: var(--border-radius-md);
+    padding: var(--space-sm) 12px;
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -162,7 +100,7 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
+    padding: var(--space-md);
     border-bottom: 1px solid var(--border-color);
     min-height: var(--header-height);
 }
@@ -194,7 +132,7 @@ input:focus, select:focus, textarea:focus {
 .sidebar-content {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    padding: var(--space-md);
 }
 
 .sidebar-content::-webkit-scrollbar {
@@ -216,7 +154,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Config Sections */
 .config-section {
-    margin-bottom: 24px;
+    margin-bottom: var(--space-lg);
 }
 
 .config-section h3 {
@@ -225,11 +163,11 @@ input:focus, select:focus, textarea:focus {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-muted);
-    margin-bottom: 12px;
+    margin-bottom: calc(var(--space-sm) + var(--space-xs));
 }
 
 .config-group {
-    margin-bottom: 12px;
+    margin-bottom: calc(var(--space-sm) + var(--space-xs));
 }
 
 .config-group label {
@@ -241,7 +179,7 @@ input:focus, select:focus, textarea:focus {
 
 .config-select {
     width: 100%;
-    padding: 8px 12px;
+    padding: var(--space-sm) calc(var(--space-sm) + var(--space-xs));
     font-size: 13px;
     cursor: pointer;
 }
@@ -251,7 +189,7 @@ input:focus, select:focus, textarea:focus {
     height: 6px;
     -webkit-appearance: none;
     background: var(--bg-tertiary);
-    border-radius: 3px;
+    border-radius: var(--border-radius-sm);
     border: none;
     padding: 0;
 }
@@ -331,13 +269,13 @@ input:focus, select:focus, textarea:focus {
 .agent-toggles {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .agent-toggle {
-    padding: 8px;
+    padding: var(--space-sm);
     background: var(--bg-tertiary);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     transition: background var(--transition-fast);
 }
 
@@ -370,10 +308,10 @@ input:focus, select:focus, textarea:focus {
 .connection-status {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: var(--space-sm);
+    padding: var(--space-sm) calc(var(--space-sm) + var(--space-xs));
     background: var(--bg-tertiary);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     font-size: 13px;
 }
 
@@ -401,7 +339,7 @@ input:focus, select:focus, textarea:focus {
 .tag-input-container {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     padding: 6px;
     min-height: 38px;
 }
@@ -409,19 +347,19 @@ input:focus, select:focus, textarea:focus {
 .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 4px;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xs);
 }
 
 .tag {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
+    gap: var(--space-xs);
+    padding: 2px var(--space-sm);
     background: var(--accent-blue);
     color: white;
     font-size: 12px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
 }
 
 .tag-remove {
@@ -438,7 +376,7 @@ input:focus, select:focus, textarea:focus {
     width: 100%;
     border: none;
     background: transparent;
-    padding: 4px;
+    padding: var(--space-xs);
     font-size: 13px;
 }
 
@@ -451,13 +389,13 @@ input:focus, select:focus, textarea:focus {
 .history-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .history-item {
     padding: 10px;
     background: var(--bg-tertiary);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     cursor: pointer;
     transition: background var(--transition-fast);
 }
@@ -472,7 +410,7 @@ input:focus, select:focus, textarea:focus {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-xs);
 }
 
 .history-item-meta {
@@ -503,8 +441,8 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    padding: 0 16px;
+    gap: var(--space-md);
+    padding: 0 var(--space-md);
     height: var(--header-height);
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
@@ -513,7 +451,7 @@ input:focus, select:focus, textarea:focus {
 .logo {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .logo-icon {
@@ -541,7 +479,7 @@ input:focus, select:focus, textarea:focus {
     height: 40px;
     align-items: center;
     justify-content: center;
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     color: var(--text-secondary);
 }
 
@@ -561,14 +499,14 @@ input:focus, select:focus, textarea:focus {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
+    padding: var(--space-lg);
     scroll-behavior: smooth;
 }
 
 /* Messages */
 .message {
     max-width: 900px;
-    margin: 0 auto 24px;
+    margin: 0 auto var(--space-lg);
     animation: fadeIn 0.3s ease;
 }
 
@@ -578,7 +516,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .message-content {
-    padding: 16px 20px;
+    padding: var(--space-md) 20px;
     border-radius: var(--border-radius-lg);
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -596,18 +534,18 @@ input:focus, select:focus, textarea:focus {
 
 .system-message h2 {
     font-size: 20px;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-sm);
 }
 
 .system-message p {
     color: var(--text-secondary);
-    margin-bottom: 16px;
+    margin-bottom: var(--space-md);
 }
 
 .example-queries {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .example-btn {
@@ -615,7 +553,7 @@ input:focus, select:focus, textarea:focus {
     padding: 10px 14px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     font-size: 13px;
     color: var(--text-secondary);
     transition: all var(--transition-fast);
@@ -635,15 +573,15 @@ input:focus, select:focus, textarea:focus {
 .agent-message .message-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: var(--space-sm);
+    margin-bottom: calc(var(--space-sm) + var(--space-xs));
 }
 
 .agent-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
+    gap: var(--space-xs);
+    padding: var(--space-xs) 10px;
     background: var(--bg-tertiary);
     border-radius: 20px;
     font-size: 12px;
@@ -672,7 +610,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Progress Container */
 .progress-container {
-    padding: 16px 24px;
+    padding: var(--space-md) var(--space-lg);
     background: var(--bg-secondary);
     border-top: 1px solid var(--border-color);
 }
@@ -681,7 +619,7 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-sm);
 }
 
 .progress-phase {
@@ -697,15 +635,15 @@ input:focus, select:focus, textarea:focus {
 .progress-bar-container {
     height: 6px;
     background: var(--bg-tertiary);
-    border-radius: 3px;
+    border-radius: var(--border-radius-sm);
     overflow: hidden;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-sm);
 }
 
 .progress-bar {
     height: 100%;
     background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
-    border-radius: 3px;
+    border-radius: var(--border-radius-sm);
     transition: width 0.3s ease;
     width: 0%;
 }
@@ -719,18 +657,18 @@ input:focus, select:focus, textarea:focus {
 
 .agent-activity {
     display: flex;
-    gap: 8px;
-    margin-top: 12px;
+    gap: var(--space-sm);
+    margin-top: calc(var(--space-sm) + var(--space-xs));
     flex-wrap: wrap;
 }
 
 .activity-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
     background: var(--bg-tertiary);
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
     font-size: 11px;
 }
 
@@ -741,7 +679,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Input Container */
 .input-container {
-    padding: 16px 24px 24px;
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
     background: var(--bg-primary);
     border-top: 1px solid var(--border-color);
 }
@@ -784,11 +722,11 @@ input:focus, select:focus, textarea:focus {
 
 .input-actions {
     position: absolute;
-    right: 8px;
-    bottom: 8px;
+    right: var(--space-sm);
+    bottom: var(--space-sm);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .char-count {
@@ -804,7 +742,7 @@ input:focus, select:focus, textarea:focus {
     justify-content: center;
     background: var(--accent-primary);
     color: white;
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
@@ -821,7 +759,7 @@ input:focus, select:focus, textarea:focus {
 
 .input-hint {
     max-width: 900px;
-    margin: 8px auto 0;
+    margin: var(--space-sm) auto 0;
     font-size: 12px;
     color: var(--text-muted);
     text-align: center;
@@ -832,7 +770,7 @@ input:focus, select:focus, textarea:focus {
     padding: 2px 6px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
     font-family: var(--font-mono);
     font-size: 11px;
 }
@@ -845,7 +783,7 @@ input:focus, select:focus, textarea:focus {
     position: fixed;
     inset: 0;
     display: none;
-    z-index: 1000;
+    z-index: var(--z-modal);
 }
 
 .modal.open,
@@ -857,7 +795,7 @@ input:focus, select:focus, textarea:focus {
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(var(--space-xs));
 }
 
 .modal-content {
@@ -885,7 +823,7 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
+    padding: var(--space-md) 20px;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -895,7 +833,7 @@ input:focus, select:focus, textarea:focus {
 
 .modal-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
 .modal-body {
@@ -905,7 +843,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .modal-footer {
-    padding: 12px 20px;
+    padding: calc(var(--space-sm) + var(--space-xs)) 20px;
     border-top: 1px solid var(--border-color);
     font-size: 12px;
     color: var(--text-muted);
@@ -916,10 +854,10 @@ input:focus, select:focus, textarea:focus {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
+    padding: var(--space-sm) 14px;
     font-size: 13px;
     font-weight: 500;
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     transition: all var(--transition-fast);
 }
 
@@ -954,28 +892,33 @@ input:focus, select:focus, textarea:focus {
     background: var(--bg-hover);
 }
 
+.btn-full {
+    width: 100%;
+    justify-content: center;
+}
+
 /* ============================================================================
    Toast Notifications
    ============================================================================ */
 
 .toast-container {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: var(--space-lg);
+    right: var(--space-lg);
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    z-index: 1100;
+    gap: var(--space-sm);
+    z-index: var(--z-toast);
 }
 
 .toast {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
+    gap: calc(var(--space-sm) + var(--space-xs));
+    padding: calc(var(--space-sm) + var(--space-xs)) var(--space-md);
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     box-shadow: var(--shadow-md);
     animation: toastIn 0.3s ease;
     max-width: 400px;
@@ -1018,24 +961,24 @@ input:focus, select:focus, textarea:focus {
 .markdown-content h2,
 .markdown-content h3,
 .markdown-content h4 {
-    margin: 24px 0 12px;
+    margin: var(--space-lg) 0 calc(var(--space-sm) + var(--space-xs));
     font-weight: 600;
     line-height: 1.3;
 }
 
 .markdown-content h1 { font-size: 24px; }
-.markdown-content h2 { font-size: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+.markdown-content h2 { font-size: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-sm); }
 .markdown-content h3 { font-size: 16px; }
 .markdown-content h4 { font-size: 14px; }
 
 .markdown-content p {
-    margin: 12px 0;
+    margin: calc(var(--space-sm) + var(--space-xs)) 0;
 }
 
 .markdown-content ul,
 .markdown-content ol {
-    margin: 12px 0;
-    padding-left: 24px;
+    margin: calc(var(--space-sm) + var(--space-xs)) 0;
+    padding-left: var(--space-lg);
 }
 
 .markdown-content li {
@@ -1047,15 +990,15 @@ input:focus, select:focus, textarea:focus {
     font-size: 13px;
     background: var(--bg-tertiary);
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
 }
 
 .markdown-content pre {
     background: var(--bg-tertiary);
-    border-radius: var(--border-radius);
-    padding: 16px;
+    border-radius: var(--border-radius-md);
+    padding: var(--space-md);
     overflow-x: auto;
-    margin: 16px 0;
+    margin: var(--space-md) 0;
 }
 
 .markdown-content pre code {
@@ -1065,15 +1008,15 @@ input:focus, select:focus, textarea:focus {
 
 .markdown-content blockquote {
     border-left: 3px solid var(--accent-blue);
-    padding-left: 16px;
-    margin: 16px 0;
+    padding-left: var(--space-md);
+    margin: var(--space-md) 0;
     color: var(--text-secondary);
 }
 
 .markdown-content table {
     width: 100%;
     border-collapse: collapse;
-    margin: 16px 0;
+    margin: var(--space-md) 0;
 }
 
 .markdown-content th,
@@ -1091,7 +1034,7 @@ input:focus, select:focus, textarea:focus {
 .markdown-content hr {
     border: none;
     border-top: 1px solid var(--border-color);
-    margin: 24px 0;
+    margin: var(--space-lg) 0;
 }
 
 .markdown-content a {
@@ -1100,7 +1043,7 @@ input:focus, select:focus, textarea:focus {
 
 .markdown-content img {
     max-width: 100%;
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
 }
 
 /* ============================================================================
@@ -1117,7 +1060,7 @@ input:focus, select:focus, textarea:focus {
         top: 0;
         height: 100vh;
         width: var(--sidebar-width);
-        z-index: 100;
+        z-index: var(--z-sidebar);
         transform: translateX(-100%);
     }
 
@@ -1150,15 +1093,15 @@ input:focus, select:focus, textarea:focus {
     }
 
     .chat-messages {
-        padding: 16px;
+        padding: var(--space-md);
     }
 
     .input-container {
-        padding: 12px 16px 16px;
+        padding: calc(var(--space-sm) + var(--space-xs)) var(--space-md) var(--space-md);
     }
 
     .message-content {
-        padding: 12px 14px;
+        padding: calc(var(--space-sm) + var(--space-xs)) 14px;
     }
 
     .modal-content {
@@ -1175,7 +1118,7 @@ input:focus, select:focus, textarea:focus {
 
 .loading-dots {
     display: inline-flex;
-    gap: 4px;
+    gap: var(--space-xs);
 }
 
 .loading-dots span {
@@ -1194,18 +1137,7 @@ input:focus, select:focus, textarea:focus {
     40% { transform: scale(1); opacity: 1; }
 }
 
-/* Skeleton Loading */
-.skeleton {
-    background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-hover) 50%, var(--bg-tertiary) 75%);
-    background-size: 200% 100%;
-    animation: skeleton 1.5s infinite;
-    border-radius: var(--border-radius);
-}
-
-@keyframes skeleton {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
+/* Note: Skeleton loading styles are defined in skeleton.css */
 
 /* ============================================================================
    Utility Classes
@@ -1215,14 +1147,14 @@ input:focus, select:focus, textarea:focus {
 .invisible { visibility: hidden; }
 .text-center { text-align: center; }
 .text-muted { color: var(--text-muted); }
-.mt-1 { margin-top: 4px; }
-.mt-2 { margin-top: 8px; }
-.mt-3 { margin-top: 12px; }
-.mt-4 { margin-top: 16px; }
-.mb-1 { margin-bottom: 4px; }
-.mb-2 { margin-bottom: 8px; }
-.mb-3 { margin-bottom: 12px; }
-.mb-4 { margin-bottom: 16px; }
+.mt-1 { margin-top: var(--space-xs); }
+.mt-2 { margin-top: var(--space-sm); }
+.mt-3 { margin-top: calc(var(--space-sm) + var(--space-xs)); }
+.mt-4 { margin-top: var(--space-md); }
+.mb-1 { margin-bottom: var(--space-xs); }
+.mb-2 { margin-bottom: var(--space-sm); }
+.mb-3 { margin-bottom: calc(var(--space-sm) + var(--space-xs)); }
+.mb-4 { margin-bottom: var(--space-md); }
 
 /* ============================================================================
    Additional Component Styles
@@ -1232,10 +1164,10 @@ input:focus, select:focus, textarea:focus {
 .activity-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-sm);
     padding: 6px 10px;
     background: var(--bg-tertiary);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius-md);
     font-size: 12px;
 }
 
@@ -1291,14 +1223,14 @@ input:focus, select:focus, textarea:focus {
 
 .history-meta {
     display: flex;
-    gap: 8px;
+    gap: var(--space-sm);
     font-size: 11px;
     color: var(--text-muted);
 }
 
 .history-status {
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: var(--border-radius-sm);
     font-size: 10px;
     font-weight: 500;
     text-transform: uppercase;
@@ -1320,7 +1252,7 @@ input:focus, select:focus, textarea:focus {
 
 /* View Report Button */
 .view-report-btn {
-    margin-top: 16px;
+    margin-top: var(--space-md);
 }
 
 /* Connection Status Styles */
@@ -1329,7 +1261,7 @@ input:focus, select:focus, textarea:focus {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    margin-right: 8px;
+    margin-right: var(--space-sm);
 }
 
 .status-dot.connected {
@@ -1345,6 +1277,11 @@ input:focus, select:focus, textarea:focus {
 
 .status-dot.disconnected {
     background: var(--accent-red);
+}
+
+.status-dot.warning {
+    background: var(--accent-warning);
+    animation: pulse 1.5s infinite;
 }
 
 .status-dot.completed {
@@ -1402,4 +1339,115 @@ input:focus, select:focus, textarea:focus {
         border: none;
         transform: none;
     }
+}
+
+/* ============================================================================
+   Keyboard Help Modal
+   ============================================================================ */
+
+.keyboard-help-modal .keyboard-help-content {
+    max-width: 600px;
+    width: 90%;
+}
+
+.keyboard-shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.keyboard-shortcut-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    transition: background var(--transition-fast);
+}
+
+.keyboard-shortcut-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.keyboard-shortcut-key {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: 0 2px 0 var(--border-color);
+    font-weight: 600;
+    min-width: 120px;
+    text-align: center;
+}
+
+.keyboard-shortcut-desc {
+    flex: 1;
+    margin-left: var(--space-lg);
+    color: var(--text-secondary);
+}
+
+.keyboard-help-footer {
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.keyboard-help-footer p {
+    margin: var(--space-xs) 0;
+    color: var(--text-tertiary);
+    font-size: 0.9rem;
+}
+
+.keyboard-help-footer kbd {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-weight: 600;
+}
+
+/* ============================================================================
+   Accessibility Enhancements
+   ============================================================================ */
+
+/* Focus visible styles for keyboard navigation */
+*:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+/* Skip link for screen readers */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--accent-blue);
+    color: white;
+    padding: var(--space-sm) var(--space-md);
+    text-decoration: none;
+    z-index: 100;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* Visually hidden but accessible to screen readers */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
 }

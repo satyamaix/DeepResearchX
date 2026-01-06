@@ -1,0 +1,670 @@
+/* ============================================================================
+   DRX Chat Component Styles
+   ============================================================================ */
+
+/* ============================================================================
+   Chat Message Layout
+   ============================================================================ */
+
+.chat-message {
+    display: flex;
+    flex-direction: column;
+    max-width: 900px;
+    margin: 0 auto var(--space-md);
+    animation: chatMessageIn 0.3s ease;
+}
+
+@keyframes chatMessageIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* User messages - right aligned */
+.chat-message.user {
+    align-items: flex-end;
+}
+
+.chat-message.user .chat-bubble {
+    background: var(--accent-blue);
+    color: white;
+    border-color: transparent;
+    border-bottom-right-radius: var(--border-radius-sm);
+}
+
+/* Assistant messages - left aligned */
+.chat-message.assistant {
+    align-items: flex-start;
+}
+
+.chat-message.assistant .chat-bubble {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-bottom-left-radius: var(--border-radius-sm);
+}
+
+/* System messages - centered */
+.chat-message.system {
+    align-items: center;
+}
+
+.chat-message.system .chat-bubble {
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+    border: 1px solid var(--border-color);
+    text-align: center;
+}
+
+/* ============================================================================
+   Chat Bubble
+   ============================================================================ */
+
+.chat-bubble {
+    max-width: 80%;
+    min-width: 100px;
+    padding: var(--space-md) var(--space-md);
+    border-radius: var(--border-radius-lg);
+    position: relative;
+}
+
+.chat-bubble-content {
+    font-size: 15px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Markdown content in bubbles */
+.chat-bubble .markdown-content {
+    font-size: 15px;
+}
+
+.chat-bubble .markdown-content > *:first-child {
+    margin-top: 0;
+}
+
+.chat-bubble .markdown-content > *:last-child {
+    margin-bottom: 0;
+}
+
+/* ============================================================================
+   Message Header (Role indicator)
+   ============================================================================ */
+
+.chat-message-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xs);
+    padding: 0 var(--space-xs);
+}
+
+.chat-role-indicator {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+
+.chat-message.user .chat-role-indicator {
+    color: var(--accent-blue);
+}
+
+.chat-message.assistant .chat-role-indicator {
+    color: var(--accent-primary);
+}
+
+/* ============================================================================
+   Message Footer (Timestamp & Status)
+   ============================================================================ */
+
+.chat-message-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+    padding: 0 var(--space-xs);
+}
+
+.chat-message.user .chat-message-footer {
+    justify-content: flex-end;
+}
+
+.chat-timestamp {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   Status Indicators
+   ============================================================================ */
+
+.chat-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.chat-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    transition: background var(--transition-fast);
+}
+
+/* Status: Sending */
+.chat-status.sending .chat-status-dot {
+    background: var(--accent-orange);
+    animation: statusPulse 1s infinite;
+}
+
+.chat-status.sending::after {
+    content: 'Sending';
+}
+
+/* Status: Streaming */
+.chat-status.streaming .chat-status-dot {
+    background: var(--accent-blue);
+    animation: statusPulse 0.8s infinite;
+}
+
+.chat-status.streaming::after {
+    content: 'Streaming';
+}
+
+/* Status: Complete */
+.chat-status.complete .chat-status-dot {
+    background: var(--accent-primary);
+}
+
+.chat-status.complete::after {
+    content: 'Sent';
+}
+
+/* Status: Error */
+.chat-status.error .chat-status-dot {
+    background: var(--accent-red);
+}
+
+.chat-status.error::after {
+    content: 'Error';
+    color: var(--accent-red);
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ============================================================================
+   Message Actions
+   ============================================================================ */
+
+.chat-actions {
+    display: flex;
+    gap: var(--space-xs);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    margin-top: var(--space-xs);
+}
+
+.chat-message:hover .chat-actions,
+.chat-message:focus-within .chat-actions {
+    opacity: 1;
+}
+
+.chat-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.chat-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+}
+
+.chat-action-btn.copied {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.chat-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Retry button for error messages */
+.chat-action-btn.retry {
+    color: var(--accent-red);
+}
+
+.chat-action-btn.retry:hover {
+    background: rgba(248, 81, 73, 0.15);
+    border-color: var(--accent-red);
+}
+
+/* ============================================================================
+   Typing Indicator
+   ============================================================================ */
+
+.chat-typing-indicator {
+    display: none;
+    align-items: flex-start;
+    max-width: 900px;
+    margin: 0 auto var(--space-md);
+}
+
+.chat-typing-indicator.active {
+    display: flex;
+}
+
+.typing-bubble {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    border-bottom-left-radius: var(--border-radius-sm);
+}
+
+.typing-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.typing-dots span {
+    width: 8px;
+    height: 8px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: 0s; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+    0%, 80%, 100% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+    40% {
+        transform: translateY(-6px);
+        opacity: 1;
+    }
+}
+
+.typing-label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   Waiting Phase Indicator
+   ============================================================================ */
+
+.chat-waiting-indicator {
+    display: none;
+    align-items: flex-start;
+    max-width: 900px;
+    margin: 0 auto var(--space-md);
+}
+
+.chat-waiting-indicator.active {
+    display: flex;
+}
+
+.waiting-bubble {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    border-bottom-left-radius: var(--border-radius-sm);
+}
+
+.waiting-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: waitingSpin 1s linear infinite;
+}
+
+@keyframes waitingSpin {
+    to { transform: rotate(360deg); }
+}
+
+.waiting-phase {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.waiting-phase-icon {
+    margin-right: var(--space-xs);
+}
+
+/* Phase-specific colors */
+.waiting-bubble[data-phase="planning"] .waiting-spinner {
+    border-top-color: var(--accent-purple);
+}
+
+.waiting-bubble[data-phase="searching"] .waiting-spinner {
+    border-top-color: var(--accent-blue);
+}
+
+.waiting-bubble[data-phase="reading"] .waiting-spinner {
+    border-top-color: var(--accent-orange);
+}
+
+.waiting-bubble[data-phase="synthesizing"] .waiting-spinner {
+    border-top-color: var(--accent-primary);
+}
+
+.waiting-bubble[data-phase="reviewing"] .waiting-spinner {
+    border-top-color: var(--accent-red);
+}
+
+/* ============================================================================
+   Virtualization Styles
+   ============================================================================ */
+
+.chat-virtual-container {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.chat-virtual-spacer-top,
+.chat-virtual-spacer-bottom {
+    width: 100%;
+    pointer-events: none;
+}
+
+.chat-virtual-content {
+    padding: var(--space-lg);
+}
+
+/* ============================================================================
+   Scroll to Bottom Button
+   ============================================================================ */
+
+.chat-scroll-bottom {
+    position: fixed;
+    bottom: calc(var(--input-height) + var(--space-lg));
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-fast);
+    z-index: 50;
+}
+
+.chat-scroll-bottom:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent-blue);
+}
+
+.chat-scroll-bottom.visible {
+    display: flex;
+    animation: scrollBtnIn 0.2s ease;
+}
+
+@keyframes scrollBtnIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.chat-scroll-bottom svg {
+    width: 14px;
+    height: 14px;
+}
+
+.chat-new-messages-badge {
+    background: var(--accent-blue);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: var(--space-xs);
+}
+
+/* ============================================================================
+   Empty State
+   ============================================================================ */
+
+.chat-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: var(--space-xl);
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.chat-empty-icon {
+    font-size: 48px;
+    margin-bottom: var(--space-md);
+    opacity: 0.5;
+}
+
+.chat-empty-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+}
+
+.chat-empty-description {
+    font-size: 14px;
+    max-width: 400px;
+}
+
+/* ============================================================================
+   Streaming Cursor
+   ============================================================================ */
+
+.chat-bubble.streaming .chat-bubble-content::after {
+    content: '';
+    display: inline-block;
+    width: 2px;
+    height: 1.2em;
+    background: var(--accent-blue);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: streamingCursor 1s step-end infinite;
+}
+
+@keyframes streamingCursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* ============================================================================
+   Error Message Styles
+   ============================================================================ */
+
+.chat-message.error .chat-bubble {
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid var(--accent-red);
+}
+
+.chat-error-content {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+}
+
+.chat-error-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    color: var(--accent-red);
+}
+
+.chat-error-text {
+    color: var(--text-primary);
+}
+
+.chat-error-details {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* ============================================================================
+   Message Context Menu (Touch Long-Press)
+   ============================================================================ */
+
+.message-context-menu {
+    position: absolute;
+    top: 50%;
+    right: -8px;
+    transform: translateX(100%) translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    z-index: 1000;
+    min-width: 140px;
+    animation: contextMenuIn 0.15s ease;
+}
+
+@keyframes contextMenuIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%) translateY(-50%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(100%) translateY(-50%) scale(1);
+    }
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.context-menu-item:hover {
+    background: var(--bg-hover);
+    color: var(--accent-primary);
+}
+
+.context-menu-item:active {
+    background: var(--bg-tertiary);
+}
+
+.context-menu-item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.context-menu-item + .context-menu-item {
+    border-top: 1px solid var(--border-color);
+}
+
+/* On mobile, show menu centered over message */
+@media (max-width: 768px) {
+    .message-context-menu {
+        right: auto;
+        left: 50%;
+        top: auto;
+        bottom: -8px;
+        transform: translateX(-50%) translateY(100%);
+    }
+
+    @keyframes contextMenuIn {
+        from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(100%) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(100%) scale(1);
+        }
+    }
+}
+
+/* ============================================================================
+   Responsive Adjustments
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .chat-bubble {
+        max-width: 90%;
+    }
+
+    .chat-message {
+        margin-bottom: var(--space-sm);
+    }
+
+    .chat-actions {
+        opacity: 1;
+    }
+
+    .chat-scroll-bottom {
+        bottom: calc(var(--input-height) + var(--space-md));
+        padding: var(--space-xs) var(--space-sm);
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-bubble {
+        max-width: 95%;
+        padding: var(--space-sm) var(--space-sm);
+    }
+
+    .chat-message-footer {
+        flex-wrap: wrap;
+    }
+}

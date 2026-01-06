@@ -1,0 +1,116 @@
+/* ============================================================================
+   DRX Deep Research - Skeleton Loading States
+   ============================================================================ */
+
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: var(--border-radius-sm);
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skeleton element variants */
+.skeleton-text {
+  height: 1em;
+  margin: 0.5em 0;
+}
+
+.skeleton-title {
+  height: 1.5em;
+  width: 60%;
+}
+
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.skeleton-button {
+  width: 80px;
+  height: 32px;
+}
+
+/* Additional skeleton variants for the research UI */
+.skeleton-paragraph {
+  height: 1em;
+  margin: var(--space-sm) 0;
+}
+
+.skeleton-paragraph:nth-child(odd) {
+  width: 100%;
+}
+
+.skeleton-paragraph:nth-child(even) {
+  width: 85%;
+}
+
+.skeleton-card {
+  padding: var(--space-md);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.skeleton-card .skeleton-title {
+  margin-bottom: var(--space-md);
+}
+
+.skeleton-message {
+  max-width: 900px;
+  margin: 0 auto var(--space-lg);
+  padding: var(--space-md);
+  border-radius: var(--border-radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.skeleton-message .skeleton-avatar {
+  display: inline-block;
+  margin-bottom: var(--space-sm);
+}
+
+/* Skeleton for sidebar items */
+.skeleton-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.skeleton-sidebar-item .skeleton-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--border-radius-sm);
+  flex-shrink: 0;
+}
+
+.skeleton-sidebar-item .skeleton-label {
+  flex: 1;
+  height: 1em;
+}
+
+/* Skeleton for history list */
+.skeleton-history-item {
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-tertiary);
+}
+
+.skeleton-history-item .skeleton-query {
+  height: 1em;
+  width: 80%;
+  margin-bottom: var(--space-xs);
+}
+
+.skeleton-history-item .skeleton-meta {
+  height: 0.8em;
+  width: 40%;
+}

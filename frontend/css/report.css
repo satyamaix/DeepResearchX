@@ -1,0 +1,802 @@
+/* ============================================================================
+   DRX Report Display Optimization - WP-2C
+   Styles for enhanced report modal with TOC, progress, and navigation
+   ============================================================================ */
+
+/* ============================================================================
+   Report Modal Layout
+   ============================================================================ */
+
+.report-modal .modal-content {
+    max-width: 1200px;
+    width: 95%;
+    height: 90vh;
+    max-height: 90vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 1fr;
+}
+
+.report-modal.has-toc .modal-content {
+    grid-template-columns: 280px 1fr;
+}
+
+/* ============================================================================
+   Reading Progress Bar
+   ============================================================================ */
+
+.report-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--bg-tertiary);
+    z-index: 10;
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+    overflow: hidden;
+}
+
+.report-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+    width: 0%;
+    transition: width 0.1s ease-out;
+}
+
+/* ============================================================================
+   Report Header (spans full width)
+   ============================================================================ */
+
+.report-modal .modal-header {
+    grid-column: 1 / -1;
+    position: relative;
+    padding-top: calc(var(--space-md) + 3px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.modal-header-left h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.report-modal .modal-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.report-modal .modal-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Download dropdown */
+.download-dropdown {
+    position: relative;
+}
+
+.download-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: var(--space-xs);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-md);
+    min-width: 150px;
+    z-index: 20;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast);
+}
+
+.download-dropdown.open .download-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.download-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    font-size: 13px;
+    color: var(--text-primary);
+    text-align: left;
+    transition: background var(--transition-fast);
+}
+
+.download-dropdown-item:hover {
+    background: var(--bg-hover);
+}
+
+.download-dropdown-item:first-child {
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+}
+
+.download-dropdown-item:last-child {
+    border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+}
+
+/* ============================================================================
+   Table of Contents Sidebar
+   ============================================================================ */
+
+.report-toc-sidebar {
+    display: none;
+    flex-direction: column;
+    background: var(--bg-tertiary);
+    border-right: 1px solid var(--border-color);
+    overflow: hidden;
+    grid-row: 2;
+}
+
+.report-modal.has-toc .report-toc-sidebar {
+    display: flex;
+}
+
+.report-toc-header {
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.report-toc-header h4 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.toc-toggle-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-muted);
+    transition: all var(--transition-fast);
+}
+
+.toc-toggle-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.report-toc-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-sm);
+}
+
+.report-toc-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.report-toc-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.report-toc-content::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+/* TOC List Styles */
+.toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.toc-item {
+    margin: 2px 0;
+}
+
+.toc-link {
+    display: block;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-radius: var(--border-radius-sm);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-left: 2px solid transparent;
+}
+
+.toc-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.toc-link.active {
+    background: rgba(88, 166, 255, 0.1);
+    color: var(--accent-primary);
+    border-left-color: var(--accent-primary);
+}
+
+/* TOC Heading Levels */
+.toc-item[data-level="1"] .toc-link {
+    font-weight: 600;
+}
+
+.toc-item[data-level="2"] .toc-link {
+    padding-left: 20px;
+    font-size: 12px;
+}
+
+.toc-item[data-level="3"] .toc-link {
+    padding-left: 32px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   Report Body (Main Content Area)
+   ============================================================================ */
+
+.report-body-wrapper {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    grid-row: 2;
+}
+
+.report-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-lg) var(--space-xl);
+    scroll-behavior: smooth;
+}
+
+.report-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.report-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.report-body::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.report-body::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+}
+
+/* ============================================================================
+   Collapsible Sections
+   ============================================================================ */
+
+.report-section {
+    margin-bottom: var(--space-lg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    transition: border-color var(--transition-fast);
+}
+
+.report-section:hover {
+    border-color: var(--border-hover);
+}
+
+.report-section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition-fast);
+}
+
+.report-section-header:hover {
+    background: var(--bg-hover);
+}
+
+.section-collapse-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: transform var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.report-section.collapsed .section-collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.report-section-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.section-word-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius-sm);
+}
+
+.report-section-content {
+    padding: var(--space-md);
+    max-height: 2000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.report-section.collapsed .report-section-content {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+/* ============================================================================
+   Jump to Top Button
+   ============================================================================ */
+
+.jump-to-top {
+    position: absolute;
+    bottom: 80px;
+    right: 30px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-blue);
+    color: white;
+    border-radius: 50%;
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: all var(--transition-fast);
+    z-index: 15;
+}
+
+.jump-to-top.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.jump-to-top:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ============================================================================
+   Report Footer
+   ============================================================================ */
+
+.report-modal .modal-footer {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.report-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.report-meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.report-meta-item svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+}
+
+.report-reading-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.reading-stat {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.reading-stat strong {
+    color: var(--text-secondary);
+}
+
+/* ============================================================================
+   Lazy Loading Placeholder
+   ============================================================================ */
+
+.section-lazy-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.section-lazy-placeholder .loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: var(--space-sm);
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   Keyboard Navigation Indicator
+   ============================================================================ */
+
+.keyboard-nav-hint {
+    position: fixed;
+    bottom: var(--space-lg);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: 12px;
+    color: var(--text-muted);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-fast), visibility var(--transition-fast);
+    z-index: 25;
+}
+
+.keyboard-nav-hint.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.keyboard-nav-hint kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+/* ============================================================================
+   Section Navigation Controls
+   ============================================================================ */
+
+.section-nav-controls {
+    display: flex;
+    gap: var(--space-xs);
+    margin-left: auto;
+    padding-right: var(--space-sm);
+}
+
+.section-nav-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-muted);
+    transition: all var(--transition-fast);
+}
+
+.section-nav-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* ============================================================================
+   Responsive Styles
+   ============================================================================ */
+
+@media (max-width: 900px) {
+    .report-modal.has-toc .modal-content {
+        grid-template-columns: 1fr;
+    }
+
+    .report-toc-sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 30;
+        transform: translateX(-100%);
+        transition: transform var(--transition-normal);
+        background: var(--bg-secondary);
+    }
+
+    .report-toc-sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .report-modal.has-toc .report-toc-sidebar {
+        display: flex;
+    }
+
+    .toc-mobile-toggle {
+        display: flex !important;
+    }
+
+    .toc-mobile-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 25;
+    }
+
+    .toc-mobile-backdrop.visible {
+        display: block;
+    }
+
+    .report-body {
+        padding: var(--space-md);
+    }
+
+    .jump-to-top {
+        bottom: 70px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 600px) {
+    .report-modal .modal-content {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .report-progress-bar {
+        border-radius: 0;
+    }
+
+    .modal-actions .btn span {
+        display: none;
+    }
+
+    .modal-actions .btn {
+        padding: var(--space-sm);
+    }
+
+    .report-section-header {
+        padding: var(--space-sm) var(--space-md);
+    }
+
+    .report-section-title {
+        font-size: 14px;
+    }
+
+    .section-word-count {
+        display: none;
+    }
+
+    .keyboard-nav-hint {
+        display: none;
+    }
+}
+
+/* ============================================================================
+   Print Styles
+   ============================================================================ */
+
+@media print {
+    .report-modal .modal-backdrop,
+    .report-toc-sidebar,
+    .report-progress-bar,
+    .jump-to-top,
+    .modal-actions,
+    .keyboard-nav-hint {
+        display: none !important;
+    }
+
+    .report-modal .modal-content {
+        position: static;
+        transform: none;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        max-height: none;
+        box-shadow: none;
+    }
+
+    .report-body {
+        overflow: visible;
+        max-height: none;
+    }
+
+    .report-section {
+        break-inside: avoid;
+        border: none;
+    }
+
+    .report-section.collapsed .report-section-content {
+        max-height: none;
+        opacity: 1;
+        padding: var(--space-md);
+    }
+
+    .section-collapse-icon {
+        display: none;
+    }
+}
+
+/* ============================================================================
+   Animations
+   ============================================================================ */
+
+@keyframes highlightSection {
+    0% { background-color: rgba(88, 166, 255, 0.2); }
+    100% { background-color: transparent; }
+}
+
+.report-section.highlighted {
+    animation: highlightSection 1s ease-out;
+}
+
+/* Expand/collapse animation enhancement */
+.report-section-content {
+    will-change: max-height, opacity;
+}
+
+/* TOC link active state animation */
+.toc-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent-primary);
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: scaleY(0);
+    }
+    to {
+        transform: scaleY(1);
+    }
+}
+
+/* ============================================================================
+   Citations Panel (within report)
+   ============================================================================ */
+
+.report-citations-panel {
+    margin-top: var(--space-xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--border-color);
+}
+
+.report-citations-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-md);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.citation-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.citation-item {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-md);
+    font-size: 13px;
+}
+
+.citation-number {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-blue);
+    color: white;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.citation-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.citation-title {
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.citation-url {
+    color: var(--text-link);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.citation-url:hover {
+    text-decoration: underline;
+}

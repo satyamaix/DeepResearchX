@@ -6,9 +6,15 @@
     <title>DRX - Deep Research X</title>
     <meta name="description" content="Enterprise-grade multi-agent research system">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/skeleton.css">
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/connection.css">
     <link rel="stylesheet" href="css/dag.css">
     <link rel="stylesheet" href="css/graph.css">
+    <link rel="stylesheet" href="css/code.css">
+    <link rel="stylesheet" href="css/chat.css">
+    <link rel="stylesheet" href="css/report.css">
 </head>
 <body>
     <div class="app-container">
@@ -405,6 +411,38 @@
                     </div>
                 </div>
 
+                <!-- Configuration Management -->
+                <div class="config-section">
+                    <h3>Configuration</h3>
+                    <div class="config-group">
+                        <label for="config-preset">Quick Presets</label>
+                        <select id="config-preset" class="config-select">
+                            <option value="">Select a preset...</option>
+                            <option value="quick">Quick (2 iterations, 5 sources)</option>
+                            <option value="deep">Deep (5 iterations, 20 sources)</option>
+                            <option value="comprehensive">Comprehensive (8 iterations, 50 sources)</option>
+                            <option value="costEfficient">Cost-Efficient (free models)</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <button class="btn btn-secondary btn-full" id="export-config-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            </svg>
+                            Export Config
+                        </button>
+                    </div>
+                    <div class="config-group">
+                        <button class="btn btn-secondary btn-full" id="import-config-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                            </svg>
+                            Import Config
+                        </button>
+                        <input type="file" id="import-config-file" accept=".json" style="display: none;">
+                    </div>
+                </div>
+
                 <!-- History -->
                 <div class="config-section">
                     <h3>Recent Research</h3>
@@ -419,66 +457,174 @@
     <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- Report Modal -->
-    <div class="modal" id="report-modal">
-        <div class="modal-backdrop" onclick="closeModal()"></div>
+    <!-- Report Modal (Enhanced with TOC and Progress) -->
+    <div class="modal report-modal" id="report-modal" aria-hidden="true" role="dialog" aria-labelledby="report-modal-title">
+        <div class="modal-backdrop" onclick="DRXReport.hide()"></div>
+
+        <!-- Reading Progress Bar -->
+        <div class="report-progress-bar">
+            <div class="report-progress-fill"></div>
+        </div>
+
         <div class="modal-content">
+            <!-- Modal Header -->
             <div class="modal-header">
-                <h2>Research Report</h2>
+                <div class="modal-header-left">
+                    <!-- Mobile TOC Toggle -->
+                    <button class="btn btn-icon toc-mobile-toggle" onclick="DRXReport.toggleMobileToc()" aria-label="Toggle table of contents" style="display: none;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12h18M3 6h18M3 18h18"/>
+                        </svg>
+                    </button>
+                    <h2 id="report-modal-title">Research Report</h2>
+                </div>
                 <div class="modal-actions">
-                    <button class="btn btn-secondary" onclick="copyReport()">
+                    <!-- Expand/Collapse All -->
+                    <button class="btn btn-secondary" onclick="DRXReport.expandAll()" title="Expand all sections">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <polyline points="9 21 3 21 3 15"></polyline>
+                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                        <span>Expand</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="DRXReport.collapseAll()" title="Collapse all sections">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 14 10 14 10 20"></polyline>
+                            <polyline points="20 10 14 10 14 4"></polyline>
+                            <line x1="14" y1="10" x2="21" y2="3"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                        <span>Collapse</span>
+                    </button>
+                    <!-- Copy Button -->
+                    <button class="btn btn-secondary" onclick="DRXReport.copy()" title="Copy to clipboard">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                             <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
                         </svg>
-                        Copy
+                        <span>Copy</span>
                     </button>
-                    <button class="btn btn-secondary" onclick="downloadReport()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                        </svg>
-                        Download
-                    </button>
-                    <button class="btn btn-icon" onclick="closeModal()">
+                    <!-- Download Dropdown -->
+                    <div class="download-dropdown">
+                        <button class="btn btn-secondary" onclick="DRXReport.toggleDownloadDropdown()" title="Download report">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            </svg>
+                            <span>Download</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="download-dropdown-menu">
+                            <button class="download-dropdown-item" onclick="DRXReport.download('md')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                </svg>
+                                Markdown (.md)
+                            </button>
+                            <button class="download-dropdown-item" onclick="DRXReport.download('html')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="16 18 22 12 16 6"/>
+                                    <polyline points="8 6 2 12 8 18"/>
+                                </svg>
+                                HTML (.html)
+                            </button>
+                            <button class="download-dropdown-item" onclick="DRXReport.download('pdf')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                </svg>
+                                PDF (Print)
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Close Button -->
+                    <button class="btn btn-icon" onclick="DRXReport.hide()" aria-label="Close report">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 6L6 18M6 6l12 12"/>
                         </svg>
                     </button>
                 </div>
             </div>
-            <div class="modal-body" id="report-content">
-                <!-- Report will be rendered here -->
-            </div>
 
-            <!-- Knowledge Graph Section -->
-            <div class="graph-section" id="graph-section" style="display: none;">
-                <h3>Knowledge Graph</h3>
-                <div id="graph-container" class="graph-container">
-                    <!-- Graph controls -->
-                    <div class="graph-controls">
-                        <button class="graph-filter-btn active" data-type="" onclick="handleGraphFilter(this)">All</button>
-                        <button class="graph-filter-btn" data-type="person" onclick="handleGraphFilter(this)">People</button>
-                        <button class="graph-filter-btn" data-type="organization" onclick="handleGraphFilter(this)">Organizations</button>
-                        <button class="graph-filter-btn" data-type="concept" onclick="handleGraphFilter(this)">Concepts</button>
-                        <button class="graph-filter-btn" data-type="claim" onclick="handleGraphFilter(this)">Claims</button>
-                        <button class="graph-filter-btn export-btn" onclick="DRXGraph.exportPNG()">Export PNG</button>
-                    </div>
-                    <!-- Detail panel for node/edge info -->
-                    <div id="graph-detail-panel"></div>
-                    <!-- Legend -->
-                    <div class="graph-legend">
-                        <div class="legend-item"><span class="legend-dot person"></span><span>Person</span></div>
-                        <div class="legend-item"><span class="legend-dot organization"></span><span>Organization</span></div>
-                        <div class="legend-item"><span class="legend-dot concept"></span><span>Concept</span></div>
-                        <div class="legend-item"><span class="legend-dot event"></span><span>Event</span></div>
-                        <div class="legend-item"><span class="legend-dot claim diamond"></span><span>Claim</span></div>
+            <!-- Table of Contents Sidebar -->
+            <aside class="report-toc-sidebar" aria-label="Table of contents">
+                <div class="report-toc-header">
+                    <h4>Contents</h4>
+                    <button class="toc-toggle-btn" onclick="DRXReport.closeMobileToc()" aria-label="Close table of contents">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <nav class="report-toc-content" aria-label="Report sections">
+                    <!-- TOC will be generated dynamically -->
+                </nav>
+            </aside>
+
+            <!-- Mobile TOC Backdrop -->
+            <div class="toc-mobile-backdrop"></div>
+
+            <!-- Report Body -->
+            <div class="report-body-wrapper">
+                <div class="report-body" id="report-content">
+                    <!-- Report content will be rendered here -->
+                </div>
+
+                <!-- Knowledge Graph Section -->
+                <div class="graph-section" id="graph-section" style="display: none;">
+                    <h3>Knowledge Graph</h3>
+                    <div id="graph-container" class="graph-container">
+                        <!-- Graph controls -->
+                        <div class="graph-controls">
+                            <button class="graph-filter-btn active" data-type="" onclick="handleGraphFilter(this)">All</button>
+                            <button class="graph-filter-btn" data-type="person" onclick="handleGraphFilter(this)">People</button>
+                            <button class="graph-filter-btn" data-type="organization" onclick="handleGraphFilter(this)">Organizations</button>
+                            <button class="graph-filter-btn" data-type="concept" onclick="handleGraphFilter(this)">Concepts</button>
+                            <button class="graph-filter-btn" data-type="claim" onclick="handleGraphFilter(this)">Claims</button>
+                            <button class="graph-filter-btn export-btn" onclick="DRXGraph.exportPNG()">Export PNG</button>
+                        </div>
+                        <!-- Detail panel for node/edge info -->
+                        <div id="graph-detail-panel"></div>
+                        <!-- Legend -->
+                        <div class="graph-legend">
+                            <div class="legend-item"><span class="legend-dot person"></span><span>Person</span></div>
+                            <div class="legend-item"><span class="legend-dot organization"></span><span>Organization</span></div>
+                            <div class="legend-item"><span class="legend-dot concept"></span><span>Concept</span></div>
+                            <div class="legend-item"><span class="legend-dot event"></span><span>Event</span></div>
+                            <div class="legend-item"><span class="legend-dot claim diamond"></span><span>Claim</span></div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Jump to Top Button -->
+                <button class="jump-to-top" onclick="DRXReport.scrollToTop()" aria-label="Scroll to top">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                    </svg>
+                </button>
             </div>
 
+            <!-- Modal Footer -->
             <div class="modal-footer">
-                <div class="report-meta" id="report-meta"></div>
+                <div class="report-meta" id="report-meta">
+                    <!-- Meta info populated by JS -->
+                </div>
+                <div class="report-reading-stats">
+                    <span class="reading-stat"><strong>0%</strong> read</span>
+                </div>
             </div>
+        </div>
+
+        <!-- Keyboard Navigation Hint -->
+        <div class="keyboard-nav-hint">
+            <span><kbd>Alt</kbd>+<kbd>Up/Down</kbd> Navigate sections</span>
+            <span><kbd>Esc</kbd> Close</span>
         </div>
     </div>
 
@@ -486,11 +632,20 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js" integrity="sha512-PNCiIK7ebfKGgKsrlj6+dDf1ilHoZmJl3qhV0wd6pvjkg9/BKzh/y5BO2XHSOfcmqUdbXbL8nXvbGqfOfOtcqQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="js/markdown.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/persistence.js"></script>
+    <script src="js/chat.js"></script>
     <script src="js/state.js"></script>
+    <script src="js/config-ui.js"></script>
     <script src="js/api.js"></script>
     <script src="js/sse.js"></script>
+    <script src="js/connection.js"></script>
+    <script src="js/reconnect-ui.js"></script>
     <script src="js/dag.js"></script>
     <script src="js/graph.js"></script>
+    <script src="js/report.js"></script>
+    <script src="js/keyboard.js"></script>
+    <script src="js/touch.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

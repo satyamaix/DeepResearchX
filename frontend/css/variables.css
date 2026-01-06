@@ -1,0 +1,90 @@
+/* ============================================================================
+   DRX Deep Research - CSS Custom Properties (Design Tokens)
+   ============================================================================ */
+
+:root {
+  /* Colors - Dark Theme */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --accent-primary: #58a6ff;
+  --accent-success: #3fb950;
+  --accent-warning: #d29922;
+  --accent-danger: #f85149;
+
+  /* Extended Colors */
+  --bg-hover: #30363d;
+  --bg-active: #484f58;
+  --text-muted: #6e7681;
+  --text-link: #58a6ff;
+  --border-hover: #484f58;
+  --accent-hover: #2ea043;
+  --accent-blue: #1f6feb;
+  --accent-purple: #8957e5;
+  --accent-orange: #d29922;
+  --accent-red: #f85149;
+  --accent-green: #238636;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Typography */
+  --font-mono: 'SF Mono', 'Consolas', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+
+  /* Borders */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-color: #30363d;
+
+  /* Legacy border-radius aliases for backwards compatibility */
+  --border-radius: var(--border-radius-md);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+
+  /* Sidebar */
+  --sidebar-width: 280px;
+  --sidebar-width-collapsed: 0px;
+
+  /* Layout */
+  --header-height: 56px;
+  --input-height: 120px;
+
+  /* Z-index layers */
+  --z-sidebar: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+}
+
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --border-color: #d0d7de;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.15);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.2);
+
+  /* Extended light theme colors */
+  --bg-hover: #d8dee4;
+  --bg-active: #c0c7cf;
+  --text-muted: #8c959f;
+  --text-link: #0969da;
+  --border-hover: #8c959f;
+}
