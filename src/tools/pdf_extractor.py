@@ -16,6 +16,13 @@ from urllib.parse import urlparse
 import httpx
 from pypdf import PdfReader
 
+# Optional pdfplumber for table extraction
+try:
+    import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+
 from src.utils.url_validator import SSRFError, validate_url
 
 logger = logging.getLogger(__name__)
@@ -40,10 +47,10 @@ class PageContent(TypedDict):
 
 
 class Table(TypedDict):
-    """A table extracted from PDF (placeholder for future enhancement)."""
+    """A table extracted from PDF using pdfplumber."""
     page_number: int
-    data: list[list[str]]
-    headers: list[str] | None
+    headers: list[str]
+    rows: list[list[str]]
 
 
 class ExtractedDocument(TypedDict):
@@ -150,12 +157,15 @@ class PDFExtractor:
 
         metadata = self._extract_metadata(reader)
 
+        # Extract tables using pdfplumber
+        tables = self._extract_tables_from_bytes(pdf_bytes)
+
         return ExtractedDocument(
             text="\n\n".join(all_text_parts),
             pages=pages,
-            tables=[],  # Table extraction is a future enhancement
+            tables=tables,
             metadata=metadata,
-            extraction_method="pypdf",
+            extraction_method="pypdf+pdfplumber" if tables else "pypdf",
             source=source,
             extracted_at=datetime.utcnow().isoformat() + "Z",
         )
@@ -181,6 +191,54 @@ class PDFExtractor:
             modification_date=safe_date(meta.get("/ModDate")),
             page_count=len(reader.pages),
         )
+
+    def _extract_tables_from_bytes(self, pdf_bytes: bytes) -> list[Table]:
+        """
+        Extract tables from PDF using pdfplumber.
+
+        Args:
+            pdf_bytes: PDF content as bytes
+
+        Returns:
+            List of Table TypedDicts with page_number, headers, and rows
+        """
+        if not PDFPLUMBER_AVAILABLE:
+            logger.warning("pdfplumber not installed, table extraction disabled")
+            return []
+
+        tables: list[Table] = []
+
+        try:
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                for page_num, page in enumerate(pdf.pages[: self._max_pages], start=1):
+                    page_tables = page.extract_tables()
+
+                    for table_data in page_tables:
+                        if not table_data or len(table_data) < 2:
+                            continue  # Skip empty or header-only tables
+
+                        # First row is typically headers
+                        headers = [str(cell) if cell else "" for cell in table_data[0]]
+
+                        # Remaining rows are data
+                        rows: list[list[str]] = []
+                        for row in table_data[1:]:
+                            cleaned_row = [str(cell) if cell else "" for cell in row]
+                            rows.append(cleaned_row)
+
+                        tables.append(
+                            Table(
+                                page_number=page_num,
+                                headers=headers,
+                                rows=rows,
+                            )
+                        )
+
+        except Exception as e:
+            # Log error but don't fail extraction
+            logger.warning(f"Table extraction failed: {e}")
+
+        return tables
 
     def get_metadata_sync(self, source: str | bytes | Path) -> PDFMetadata:
         """Synchronously get just the metadata (no full extraction)."""
