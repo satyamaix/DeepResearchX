@@ -17,6 +17,7 @@ from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 
 from src.models.knowledge import Claim, Entity, Relation
+from src.tools.bias_detector import BiasReport
 
 
 # =============================================================================
@@ -276,6 +277,9 @@ class QualityMetrics(TypedDict):
     # Factual consistency score
     consistency_score: float
 
+    # Bias score from BiasDetector (0.0-1.0, higher = more bias)
+    bias_score: float
+
     # Last update timestamp
     updated_at: str
 
@@ -396,6 +400,17 @@ class AgentState(TypedDict):
 
     # Aggregated quality metrics
     quality_metrics: QualityMetrics | None
+
+    # Bias analysis report from BiasDetector
+    bias_report: BiasReport | None
+
+    # =========================================================================
+    # Knowledge Graph
+    # =========================================================================
+
+    # Serialized knowledge graph for checkpointing
+    # Contains entities, relations, and claims extracted during synthesis
+    knowledge_graph: KnowledgeGraphState
 
     # =========================================================================
     # Knowledge Graph
@@ -520,6 +535,7 @@ def create_initial_state(
         max_iterations=max_iterations,
         gaps=[],
         quality_metrics=None,
+        bias_report=None,
         knowledge_graph=create_empty_knowledge_graph(),
         policy_violations=[],
         blocked=False,

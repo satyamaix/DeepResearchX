@@ -992,6 +992,7 @@ def _create_fallback_metrics(state: AgentState) -> QualityMetrics:
         )),
         "citation_density": 0.0,
         "consistency_score": 0.5,
+        "bias_score": 0.0,
         "updated_at": now,
     }
 
