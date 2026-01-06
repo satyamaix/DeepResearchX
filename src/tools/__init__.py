@@ -59,6 +59,23 @@ from .rag_retriever import (
     DEFAULT_EMBEDDING_MODEL,
 )
 
+from .pdf_extractor import (
+    PDFExtractor,
+    ExtractedDocument,
+    PDFMetadata,
+    PageContent,
+    Table,
+    create_pdf_extractor,
+)
+
+from .citation_verifier import (
+    CitationVerifier,
+    URLStatus,
+    QuoteVerification,
+    VerificationResult,
+    create_citation_verifier,
+)
+
 __all__ = [
     # Base classes and types
     "BaseTool",
@@ -96,4 +113,17 @@ __all__ = [
     "create_rag_retriever",
     "EMBEDDING_DIMENSIONS",
     "DEFAULT_EMBEDDING_MODEL",
+    # PDF extractor
+    "PDFExtractor",
+    "ExtractedDocument",
+    "PDFMetadata",
+    "PageContent",
+    "Table",
+    "create_pdf_extractor",
+    # Citation verifier
+    "CitationVerifier",
+    "URLStatus",
+    "QuoteVerification",
+    "VerificationResult",
+    "create_citation_verifier",
 ]
