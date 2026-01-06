@@ -110,6 +110,20 @@ from src.orchestrator.budget import (
     create_budget_tracker,
 )
 
+from src.orchestrator.parallel import (
+    # Core classes
+    ParallelExecutor,
+    TaskResult,
+    AggregatedResult,
+    DependencyGraph,
+    # Utility functions
+    merge_task_results,
+    is_plan_complete as parallel_is_plan_complete,
+    has_critical_failures,
+    # Factory function
+    create_parallel_executor,
+)
+
 
 __all__ = [
     # State types
@@ -182,4 +196,13 @@ __all__ = [
     "MODEL_COSTS",
     "get_model_cost",
     "create_budget_tracker",
+    # Parallel execution
+    "ParallelExecutor",
+    "TaskResult",
+    "AggregatedResult",
+    "DependencyGraph",
+    "merge_task_results",
+    "parallel_is_plan_complete",
+    "has_critical_failures",
+    "create_parallel_executor",
 ]
