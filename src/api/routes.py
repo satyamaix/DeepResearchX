@@ -836,11 +836,12 @@ async def list_interactions(
 async def resume_interaction(
     interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")],
     checkpoint_id: Annotated[str | None, Query(description="Checkpoint ID to resume from")] = None,
-    background_tasks: BackgroundTasks = None,
-    db: DatabaseDep = None,
-    redis: RedisDep = None,
-    orchestrator: OrchestratorDep = None,
-    user: CurrentUserDep = None,
+    *,
+    background_tasks: BackgroundTasks,
+    db: DatabaseDep,
+    redis: RedisDep,
+    orchestrator: OrchestratorDep,
+    user: CurrentUserDep,
     _rate_limit: Annotated[None, Depends(rate_limit_heavy)] = None,
 ) -> InteractionResponse:
     """Resume a research interaction from a checkpoint.

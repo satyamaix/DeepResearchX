@@ -7,6 +7,7 @@ including usage tracking, estimation, and enforcement.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -140,8 +141,10 @@ class BudgetTracker:
         default_factory=lambda: datetime.utcnow().isoformat() + "Z",
         init=False,
     )
+    # Lock for thread-safe counter operations during concurrent execution
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
 
-    def track(
+    async def track(
         self,
         model: str,
         input_tokens: int,
@@ -150,6 +153,10 @@ class BudgetTracker:
     ) -> UsageRecord:
         """
         Track token usage for an LLM call.
+
+        This method is thread-safe and uses asyncio.Lock to protect
+        counter modifications from race conditions during concurrent
+        agent execution.
 
         Args:
             model: Model identifier
@@ -163,9 +170,6 @@ class BudgetTracker:
         cost = self.calculate_cost(model, input_tokens, output_tokens)
         total_tokens = input_tokens + output_tokens
 
-        self._tokens_used += total_tokens
-        self._cost_used += cost
-
         record = UsageRecord(
             model=model,
             input_tokens=input_tokens,
@@ -174,7 +178,12 @@ class BudgetTracker:
             agent=agent,
             timestamp=datetime.utcnow().isoformat() + "Z",
         )
-        self._usage_history.append(record)
+
+        # Acquire lock for thread-safe counter updates
+        async with self._lock:
+            self._tokens_used += total_tokens
+            self._cost_used += cost
+            self._usage_history.append(record)
 
         logger.debug(
             f"Budget tracked: {total_tokens} tokens, ${cost:.4f} "
