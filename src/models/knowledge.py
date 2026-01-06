@@ -376,6 +376,122 @@ class KnowledgeGraph:
 
         return results
 
+    def find_path(
+        self,
+        source_entity_id: str,
+        target_entity_id: str,
+        max_depth: int = 10,
+    ) -> dict[str, Any]:
+        """
+        Find shortest path between two entities using Dijkstra's algorithm.
+
+        Edges are weighted by inverse confidence (1 - confidence), so paths
+        through high-confidence relations are preferred.
+
+        Args:
+            source_entity_id: Starting entity ID
+            target_entity_id: Target entity ID
+            max_depth: Maximum path length to search
+
+        Returns:
+            Dict with:
+                - found: bool indicating if path was found
+                - path: list of entity IDs from source to target
+                - entities: list of Entity objects on path
+                - relations: list of Relation objects connecting path
+                - total_weight: sum of edge weights (lower = more confident)
+                - path_confidence: product of relation confidences
+                - error: error message if path not found
+                - searched: number of entities searched (if no path found)
+        """
+        import heapq
+
+        # Validate source entity exists
+        if source_entity_id not in self._entities:
+            return {"found": False, "error": "Source entity not found"}
+
+        # Validate target entity exists
+        if target_entity_id not in self._entities:
+            return {"found": False, "error": "Target entity not found"}
+
+        # Handle trivial case: source equals target
+        if source_entity_id == target_entity_id:
+            return {
+                "found": True,
+                "path": [source_entity_id],
+                "entities": [self._entities[source_entity_id]],
+                "relations": [],
+                "total_weight": 0.0,
+                "path_confidence": 1.0,
+            }
+
+        # Build adjacency list for faster neighbor lookup
+        # Maps entity_id -> list of (neighbor_id, relation, edge_weight)
+        adjacency: dict[str, list[tuple[str, Relation, float]]] = {}
+        for entity_id in self._entities:
+            adjacency[entity_id] = []
+
+        for relation in self._relations.values():
+            source_id = relation["source_entity_id"]
+            target_id = relation["target_entity_id"]
+            confidence = relation.get("confidence", 0.5)
+            edge_weight = 1.0 - confidence  # Inverse: high confidence = low weight
+
+            # Add bidirectional edges (undirected graph traversal)
+            if source_id in adjacency:
+                adjacency[source_id].append((target_id, relation, edge_weight))
+            if target_id in adjacency:
+                adjacency[target_id].append((source_id, relation, edge_weight))
+
+        # Dijkstra's algorithm
+        # Priority queue: (weight, entity_id, path, relations_on_path)
+        pq: list[tuple[float, str, list[str], list[Relation]]] = [
+            (0.0, source_entity_id, [source_entity_id], [])
+        ]
+        visited: set[str] = set()
+
+        while pq:
+            current_weight, current_id, path, path_relations = heapq.heappop(pq)
+
+            # Skip if already visited (we found a shorter path earlier)
+            if current_id in visited:
+                continue
+            visited.add(current_id)
+
+            # Check max depth constraint
+            if len(path) > max_depth:
+                continue
+
+            # Check if we reached the target
+            if current_id == target_entity_id:
+                # Build result with path entities
+                path_entities = [self._entities[eid] for eid in path]
+                path_confidence = 1.0
+                for rel in path_relations:
+                    path_confidence *= rel.get("confidence", 1.0)
+
+                return {
+                    "found": True,
+                    "path": path,
+                    "entities": path_entities,
+                    "relations": path_relations,
+                    "total_weight": current_weight,
+                    "path_confidence": path_confidence,
+                }
+
+            # Explore neighbors
+            for neighbor_id, relation, edge_weight in adjacency.get(current_id, []):
+                if neighbor_id not in visited:
+                    new_weight = current_weight + edge_weight
+                    new_path = path + [neighbor_id]
+                    new_relations = path_relations + [relation]
+                    heapq.heappush(
+                        pq, (new_weight, neighbor_id, new_path, new_relations)
+                    )
+
+        # No path found
+        return {"found": False, "error": "No path found", "searched": len(visited)}
+
     # =========================================================================
     # Export Operations
     # =========================================================================
