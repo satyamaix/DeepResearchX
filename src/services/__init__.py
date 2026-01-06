@@ -96,6 +96,15 @@ from src.services.vectorstore import (
     EmbeddingProvider,
 )
 
+from src.services.report_exporter import (
+    # Main class
+    ReportExporter,
+    # Factory function
+    create_report_exporter,
+    # Type definitions
+    ReportContext,
+)
+
 
 __all__ = [
     # Redis
@@ -142,4 +151,8 @@ __all__ = [
     "VectorSearchResult",
     "CollectionStats",
     "EmbeddingProvider",
+    # Report Exporter
+    "ReportExporter",
+    "create_report_exporter",
+    "ReportContext",
 ]

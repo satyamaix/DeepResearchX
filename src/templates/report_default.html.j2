@@ -1,0 +1,101 @@
+{% extends "report_base.html.j2" %}
+
+{% block content %}
+<header>
+    <h1>{{ title | default('Research Report') }}</h1>
+
+    <div class="metadata">
+        <div class="metadata-item">
+            <span class="metadata-label">Query:</span> {{ query }}
+        </div>
+        <div class="metadata-item">
+            <span class="metadata-label">Generated:</span> {{ generated_at }}
+        </div>
+        {% if quality_metrics %}
+        <div class="metadata-item">
+            <span class="metadata-label">Coverage:</span> {{ (quality_metrics.coverage_score * 100) | round(1) }}%
+        </div>
+        {% endif %}
+    </div>
+</header>
+
+<main>
+    {% if synthesis %}
+    <section id="synthesis">
+        <h2>Executive Summary</h2>
+        <div class="synthesis">
+            {{ synthesis | safe }}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if quality_metrics %}
+    <section id="metrics">
+        <h2>Research Quality</h2>
+        <div class="quality-metrics">
+            <div class="metric-card">
+                <div class="metric-value">{{ (quality_metrics.coverage_score * 100) | round(0) }}%</div>
+                <div class="metric-label">Coverage</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ quality_metrics.total_findings }}</div>
+                <div class="metric-label">Findings</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ quality_metrics.unique_sources }}</div>
+                <div class="metric-label">Sources</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ (quality_metrics.avg_confidence * 100) | round(0) }}%</div>
+                <div class="metric-label">Avg Confidence</div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if findings %}
+    <section id="findings">
+        <h2>Key Findings</h2>
+        {% for finding in findings[:20] %}
+        <div class="finding">
+            <div class="finding-claim">{{ finding.claim }}</div>
+            {% if finding.evidence %}
+            <div class="finding-evidence">"{{ finding.evidence[:300] }}{% if finding.evidence | length > 300 %}...{% endif %}"</div>
+            {% endif %}
+            <div style="margin-top: 0.5rem;">
+                {% set confidence = finding.confidence_score | default(0.5) %}
+                {% if confidence >= 0.7 %}
+                <span class="confidence-badge confidence-high">High Confidence</span>
+                {% elif confidence >= 0.4 %}
+                <span class="confidence-badge confidence-medium">Medium Confidence</span>
+                {% else %}
+                <span class="confidence-badge confidence-low">Low Confidence</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if knowledge_graph_svg %}
+    <section id="knowledge-graph">
+        <h2>Knowledge Graph</h2>
+        <div class="knowledge-graph">
+            {{ knowledge_graph_svg | safe }}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if citations %}
+    <section id="sources">
+        <h2>Sources ({{ citations | length }})</h2>
+        {% for citation in citations[:30] %}
+        <div class="citation">
+            <div class="citation-title">{{ citation.title | default('Untitled') }}</div>
+            <div class="citation-url">{{ citation.url }}</div>
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+</main>
+{% endblock %}
