@@ -59,6 +59,14 @@ from .rag_retriever import (
     DEFAULT_EMBEDDING_MODEL,
 )
 
+from .citation_verifier import (
+    CitationVerifier,
+    URLStatus,
+    QuoteVerification,
+    VerificationResult,
+    create_citation_verifier,
+)
+
 __all__ = [
     # Base classes and types
     "BaseTool",
@@ -96,4 +104,10 @@ __all__ = [
     "create_rag_retriever",
     "EMBEDDING_DIMENSIONS",
     "DEFAULT_EMBEDDING_MODEL",
+    # Citation verifier
+    "CitationVerifier",
+    "URLStatus",
+    "QuoteVerification",
+    "VerificationResult",
+    "create_citation_verifier",
 ]
