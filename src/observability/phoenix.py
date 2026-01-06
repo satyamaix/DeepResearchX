@@ -57,7 +57,7 @@ class PhoenixConfig:
         enabled: Master switch to enable/disable all tracing.
     """
 
-    collector_endpoint: str = "http://localhost:4317"
+    collector_endpoint: str = "localhost:4317"
     project_name: str = "drx-research"
     enable_auto_instrument: bool = True
     service_name: str = "drx-deep-research"

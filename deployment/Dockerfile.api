@@ -30,7 +30,7 @@ RUN pip install --upgrade pip setuptools wheel hatchling
 
 # Copy dependency files
 WORKDIR /build
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 
 # Install dependencies (production only, no dev dependencies)
 RUN pip install . --no-cache-dir

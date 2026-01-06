@@ -676,6 +676,157 @@ def timestamp_now() -> str:
 
 
 # =============================================================================
+# OpenRouter LLM Client Adapter
+# =============================================================================
+
+
+class OpenRouterLLMClient(LLMClient):
+    """
+    Adapter that wraps OpenRouterClient to implement the LLMClient interface.
+
+    This bridges the gap between the abstract LLMClient expected by agents
+    and the concrete OpenRouterClient implementation.
+    """
+
+    def __init__(self, openrouter_client: Any):
+        """
+        Initialize with an OpenRouterClient instance.
+
+        Args:
+            openrouter_client: An initialized OpenRouterClient
+        """
+        self._client = openrouter_client
+
+    async def chat_completion(
+        self,
+        messages: list[dict[str, str]],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs,
+    ) -> dict[str, Any]:
+        """
+        Execute a chat completion request with Phoenix tracing.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            model: Model identifier (uses default if None)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional model-specific parameters
+
+        Returns:
+            Dict containing 'content', 'usage', and metadata
+        """
+        # Import tracing utilities
+        try:
+            from src.observability import get_tracer, log_token_usage
+            tracer = get_tracer("drx.llm")
+        except Exception:
+            tracer = None
+
+        # Create span for LLM call if tracing is available
+        if tracer:
+            with tracer.start_as_current_span("llm.chat_completion") as span:
+                # Set span attributes for OpenInference
+                span.set_attribute("llm.model_name", model or "default")
+                span.set_attribute("llm.invocation_parameters", str({
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }))
+                span.set_attribute("openinference.span.kind", "LLM")
+
+                # Log input messages (truncated for large inputs)
+                if messages:
+                    input_text = messages[-1].get("content", "")[:500]
+                    span.set_attribute("llm.input_messages", str(messages[:3]))  # First 3 messages
+                    span.set_attribute("input.value", input_text)
+
+                try:
+                    # Call the underlying OpenRouterClient
+                    response = await self._client.chat_completion(
+                        messages=messages,
+                        model=model,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        **kwargs,
+                    )
+
+                    # Log output and token usage
+                    span.set_attribute("output.value", response.content[:1000] if response.content else "")
+                    span.set_attribute("llm.model_name", response.model or model or "unknown")
+
+                    if response.usage:
+                        log_token_usage(
+                            prompt_tokens=response.usage.get("prompt_tokens", 0),
+                            completion_tokens=response.usage.get("completion_tokens", 0),
+                            total_tokens=response.usage.get("total_tokens", 0),
+                            model=response.model,
+                            span=span,
+                        )
+
+                    if response.latency_ms:
+                        span.set_attribute("drx.latency_ms", response.latency_ms)
+
+                    return {
+                        "content": response.content,
+                        "usage": response.usage,
+                        "model": response.model,
+                        "finish_reason": response.finish_reason,
+                        "tool_calls": response.tool_calls,
+                        "latency_ms": response.latency_ms,
+                    }
+
+                except Exception as e:
+                    span.set_attribute("error", True)
+                    span.set_attribute("error.message", str(e))
+                    raise
+        else:
+            # No tracing available, just call directly
+            response = await self._client.chat_completion(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs,
+            )
+
+            return {
+                "content": response.content,
+                "usage": response.usage,
+                "model": response.model,
+                "finish_reason": response.finish_reason,
+                "tool_calls": response.tool_calls,
+                "latency_ms": response.latency_ms,
+            }
+
+
+# Module-level LLM client singleton
+_llm_client: OpenRouterLLMClient | None = None
+
+
+async def get_llm_client() -> OpenRouterLLMClient:
+    """
+    Get or create the LLM client singleton.
+
+    Returns:
+        OpenRouterLLMClient: Configured LLM client adapter
+    """
+    global _llm_client
+
+    if _llm_client is not None:
+        return _llm_client
+
+    # Import here to avoid circular imports
+    from src.services.openrouter_client import get_openrouter_client
+
+    openrouter_client = await get_openrouter_client()
+    _llm_client = OpenRouterLLMClient(openrouter_client)
+
+    return _llm_client
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -683,6 +834,8 @@ __all__ = [
     "AgentResponse",
     "BaseAgent",
     "LLMClient",
+    "OpenRouterLLMClient",
+    "get_llm_client",
     "create_finding_id",
     "create_citation_id",
     "create_subtask_id",

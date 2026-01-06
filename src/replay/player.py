@@ -251,7 +251,7 @@ class ReplayPlayer:
             ReplayError: If replay fails.
         """
         replay_config = {**self.DEFAULT_CONFIG, **(config or {})}
-        replay_session_id = f"replay_{uuid.uuid4().hex[:12]}"
+        replay_session_id = str(uuid.uuid4())
 
         logger.info(
             f"Starting replay of session {session_id} from checkpoint {checkpoint_id}",

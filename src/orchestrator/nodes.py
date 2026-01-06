@@ -84,27 +84,29 @@ async def get_agent(agent_type: str) -> "BaseAgent":
     if agent_type in _agents:
         return _agents[agent_type]
 
-    # Import agents lazily to avoid circular imports
-    # These imports will work once the agents module is implemented
+    # Import agents and LLM client lazily to avoid circular imports
     try:
+        from src.agents.base import get_llm_client
+        llm_client = await get_llm_client()
+
         if agent_type == "planner":
             from src.agents.planner import PlannerAgent
-            _agents[agent_type] = PlannerAgent()
+            _agents[agent_type] = PlannerAgent(llm_client=llm_client)
         elif agent_type == "searcher":
             from src.agents.searcher import SearcherAgent
-            _agents[agent_type] = SearcherAgent()
+            _agents[agent_type] = SearcherAgent(llm_client=llm_client)
         elif agent_type == "reader":
             from src.agents.reader import ReaderAgent
-            _agents[agent_type] = ReaderAgent()
+            _agents[agent_type] = ReaderAgent(llm_client=llm_client)
         elif agent_type == "synthesizer":
             from src.agents.synthesizer import SynthesizerAgent
-            _agents[agent_type] = SynthesizerAgent()
+            _agents[agent_type] = SynthesizerAgent(llm_client=llm_client)
         elif agent_type == "critic":
             from src.agents.critic import CriticAgent
-            _agents[agent_type] = CriticAgent()
+            _agents[agent_type] = CriticAgent(llm_client=llm_client)
         elif agent_type == "reporter":
             from src.agents.reporter import ReporterAgent
-            _agents[agent_type] = ReporterAgent()
+            _agents[agent_type] = ReporterAgent(llm_client=llm_client)
         else:
             raise ValueError(f"Unknown agent type: {agent_type}")
 

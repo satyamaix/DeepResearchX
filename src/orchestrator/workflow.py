@@ -736,15 +736,16 @@ class ResearchOrchestrator:
     ) -> AsyncGenerator[StreamEvent, None]:
         """Process node output and emit appropriate events."""
 
-        if node_name == "plan" and "plan" in output:
+        if node_name == "plan" and "plan" in output and output["plan"] is not None:
+            plan = output["plan"]
             yield StreamEvent(
                 event_type=StreamEventType.PLAN_CREATED,
                 session_id=session_id,
                 node_name=node_name,
                 iteration=iteration,
                 data={
-                    "task_count": len(output["plan"].get("dag_nodes", [])),
-                    "sub_questions": output["plan"].get("sub_questions", []),
+                    "task_count": len(plan.get("dag_nodes", [])),
+                    "sub_questions": plan.get("sub_questions", []),
                 },
             )
 

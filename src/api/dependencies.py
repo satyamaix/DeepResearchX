@@ -22,6 +22,7 @@ from psycopg import AsyncConnection
 
 from src.config import Settings, get_settings
 from src.db.connection import get_async_connection, get_async_pool
+from src.orchestrator.workflow import ResearchOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ async def get_redis_pool() -> RedisConnectionPool:
 
         settings = get_settings()
         _redis_pool = RedisConnectionPool.from_url(
-            settings.REDIS_URL,
+            settings.redis_url_str,
             max_connections=settings.REDIS_MAX_CONNECTIONS,
             socket_timeout=settings.REDIS_SOCKET_TIMEOUT,
             retry_on_timeout=settings.REDIS_RETRY_ON_TIMEOUT,
@@ -135,115 +136,19 @@ RedisDep = Annotated[Redis, Depends(get_redis)]
 # Orchestrator Dependencies
 # =============================================================================
 
-
-class ResearchOrchestrator:
-    """Research orchestrator for managing workflow execution.
-
-    This is a placeholder that will be replaced with the actual
-    LangGraph-based orchestrator implementation.
-    """
-
-    def __init__(self, db_pool: Any, redis: Redis, settings: Settings) -> None:
-        """Initialize the orchestrator.
-
-        Args:
-            db_pool: Database connection pool.
-            redis: Redis client for caching/pubsub.
-            settings: Application settings.
-        """
-        self._db_pool = db_pool
-        self._redis = redis
-        self._settings = settings
-        self._active_sessions: dict[str, asyncio.Task] = {}
-
-    async def run(
-        self,
-        query: str,
-        session_id: str,
-        config: dict[str, Any] | None = None,
-    ) -> AsyncGenerator[dict[str, Any], None]:
-        """Execute a research workflow.
-
-        Args:
-            query: The research query.
-            session_id: Unique session identifier.
-            config: Optional configuration overrides.
-
-        Yields:
-            StreamEvent dictionaries as research progresses.
-        """
-        # Placeholder implementation - actual implementation in orchestrator module
-        yield {
-            "event_type": "interaction.start",
-            "data": {"id": session_id, "query": query},
-            "checkpoint_id": None,
-            "timestamp": time.time(),
-        }
-
-    async def get_state(self, session_id: str) -> dict[str, Any] | None:
-        """Get current state for a session.
-
-        Args:
-            session_id: Session identifier.
-
-        Returns:
-            Current agent state or None if not found.
-        """
-        # Placeholder - actual implementation queries checkpointer
-        return None
-
-    async def resume(
-        self,
-        session_id: str,
-        checkpoint_id: str,
-    ) -> AsyncGenerator[dict[str, Any], None]:
-        """Resume a workflow from a checkpoint.
-
-        Args:
-            session_id: Session identifier.
-            checkpoint_id: Checkpoint to resume from.
-
-        Yields:
-            StreamEvent dictionaries as research continues.
-        """
-        yield {
-            "event_type": "interaction.resumed",
-            "data": {"id": session_id, "checkpoint_id": checkpoint_id},
-            "checkpoint_id": checkpoint_id,
-            "timestamp": time.time(),
-        }
-
-    async def cancel(self, session_id: str) -> bool:
-        """Cancel a running session.
-
-        Args:
-            session_id: Session to cancel.
-
-        Returns:
-            True if cancelled, False if not found.
-        """
-        task = self._active_sessions.get(session_id)
-        if task and not task.done():
-            task.cancel()
-            return True
-        return False
-
-
 # Module-level orchestrator instance
 _orchestrator: ResearchOrchestrator | None = None
 _orchestrator_lock = asyncio.Lock()
 
 
 async def get_orchestrator(
-    redis: RedisDep,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ResearchOrchestrator:
     """Provide the research orchestrator instance.
 
-    Creates a singleton orchestrator with database and Redis connections.
+    Creates a singleton orchestrator with database connection for checkpointing.
 
     Args:
-        redis: Redis client dependency.
         settings: Application settings.
 
     Returns:
@@ -258,13 +163,11 @@ async def get_orchestrator(
         if _orchestrator is not None:
             return _orchestrator
 
-        db_pool = await get_async_pool()
         _orchestrator = ResearchOrchestrator(
-            db_pool=db_pool,
-            redis=redis,
-            settings=settings,
+            db_uri=settings.database_url_str,
         )
-        logger.info("Research orchestrator initialized")
+        await _orchestrator.initialize()
+        logger.info("Research orchestrator initialized with LangGraph workflow")
         return _orchestrator
 
 

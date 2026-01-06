@@ -229,7 +229,7 @@ async def start_replay(
     # Create replay session record
     import uuid
 
-    replay_session_id = f"replay_{uuid.uuid4().hex[:16]}"
+    replay_session_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
 
     try:

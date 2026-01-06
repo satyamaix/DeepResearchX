@@ -64,18 +64,15 @@ class Settings(BaseSettings):
         description="Secret key for cryptographic operations",
     )
 
-    ALLOWED_ORIGINS: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
-        description="CORS allowed origins",
+    ALLOWED_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:8000",
+        description="CORS allowed origins (comma-separated)",
     )
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v: str | list[str]) -> list[str]:
+    @property
+    def allowed_origins_list(self) -> list[str]:
         """Parse comma-separated origins string into list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     # =========================================================================
     # Database Settings (PostgreSQL)
@@ -313,8 +310,8 @@ class Settings(BaseSettings):
     )
 
     PHOENIX_COLLECTOR_ENDPOINT: str = Field(
-        default="http://localhost:4317",
-        description="Phoenix OTLP collector endpoint",
+        default="localhost:4317",
+        description="Phoenix OTLP gRPC collector endpoint (format: host:port, no http:// prefix)",
     )
 
     PHOENIX_PROJECT_NAME: str = Field(

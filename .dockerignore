@@ -84,7 +84,11 @@ Dockerfile*
 docker-compose*.yml
 docker-compose*.yaml
 .docker/
-deployment/
+# Exclude deployment files except entrypoint scripts
+deployment/*.yaml
+deployment/*.yml
+deployment/*.sql
+deployment/*.md
 
 # Local development
 *.log

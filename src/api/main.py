@@ -118,11 +118,12 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"Schema initialization skipped: {e}")
 
-        # Initialize Phoenix/OpenTelemetry instrumentation
+        # Initialize Phoenix/OpenTelemetry instrumentation using observability module
         if settings.PHOENIX_COLLECTOR_ENDPOINT:
             try:
-                _setup_phoenix_instrumentation(settings)
-                logger.info("Phoenix instrumentation configured")
+                from src.observability import setup_phoenix
+                setup_phoenix()
+                logger.info("Phoenix instrumentation configured via observability module")
             except Exception as e:
                 logger.warning(f"Phoenix instrumentation failed: {e}")
 
@@ -136,6 +137,14 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down...")
+
+    try:
+        # Shutdown Phoenix tracing
+        from src.observability import shutdown_phoenix
+        shutdown_phoenix()
+        logger.info("Phoenix tracing shutdown")
+    except Exception as e:
+        logger.warning(f"Phoenix shutdown error: {e}")
 
     try:
         # Close Redis connections
@@ -154,52 +163,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"{API_TITLE} shutdown complete")
 
 
-def _setup_phoenix_instrumentation(settings: Settings) -> None:
-    """Configure Phoenix/OpenTelemetry instrumentation.
-
-    Args:
-        settings: Application settings with Phoenix configuration.
-    """
-    try:
-        from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-            OTLPSpanExporter,
-        )
-        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-        from opentelemetry.sdk.resources import Resource
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-        # Create resource with service name
-        resource = Resource.create(
-            {
-                "service.name": settings.PHOENIX_PROJECT_NAME,
-                "service.version": API_VERSION,
-                "deployment.environment": settings.APP_ENV,
-            }
-        )
-
-        # Create tracer provider
-        tracer_provider = TracerProvider(resource=resource)
-
-        # Add OTLP exporter
-        otlp_exporter = OTLPSpanExporter(
-            endpoint=settings.PHOENIX_COLLECTOR_ENDPOINT,
-            insecure=not settings.is_production,
-        )
-        tracer_provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
-
-        # Set global tracer provider
-        trace.set_tracer_provider(tracer_provider)
-
-        logger.info(
-            f"Phoenix instrumentation configured: {settings.PHOENIX_COLLECTOR_ENDPOINT}"
-        )
-
-    except ImportError:
-        logger.warning("OpenTelemetry packages not installed, skipping instrumentation")
-    except Exception as e:
-        logger.warning(f"Failed to configure Phoenix instrumentation: {e}")
 
 
 # =============================================================================

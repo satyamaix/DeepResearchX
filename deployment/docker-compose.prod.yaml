@@ -174,7 +174,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       # Phoenix observability
-      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:4317
+      PHOENIX_COLLECTOR_ENDPOINT: phoenix:4317
       PHOENIX_PROJECT_NAME: ${PHOENIX_PROJECT_NAME:-drx-research}
       # OpenRouter API
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
@@ -264,7 +264,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       # Phoenix observability
-      PHOENIX_COLLECTOR_ENDPOINT: http://phoenix:4317
+      PHOENIX_COLLECTOR_ENDPOINT: phoenix:4317
       PHOENIX_PROJECT_NAME: ${PHOENIX_PROJECT_NAME:-drx-research}
       # OpenRouter API
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
