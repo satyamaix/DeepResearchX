@@ -17,10 +17,20 @@ DRX orchestrates six specialized AI agents in a directed acyclic graph (DAG) to 
 - **Resilience**: Checkpoint any research task and resume from failure
 - **Extensibility**: Swap models via OpenRouter, add custom tools, modify agents
 
-```
-User Query → Planner → [Searcher ×N] → [Reader ×N] → Synthesizer → Critic → Reporter → Report
-                ↑                                                      │
-                └──────────────────── Gap Found ───────────────────────┘
+```mermaid
+flowchart LR
+    Q[User Query] --> P[Planner]
+    P --> S["Searcher ×N"]
+    S --> R["Reader ×N"]
+    R --> Sy[Synthesizer]
+    Sy --> C[Critic]
+    C -->|"Coverage < 0.7"| P
+    C -->|"Complete"| Re[Reporter]
+    Re --> O[Report]
+
+    style Q fill:#e1f5fe
+    style O fill:#c8e6c9
+    style C fill:#fff3e0
 ```
 
 ---
@@ -123,7 +133,27 @@ flowchart LR
 | **Critic** | Synthesis | Quality score + identified gaps | Citation verifier, bias detector |
 | **Reporter** | Final synthesis | Formatted report with citations | HTML/PDF exporter |
 
-### State Flow
+### Agent Workflow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Planner: User Query
+    Planner --> Searcher: Research Plan
+    Searcher --> Reader: Source URLs
+    Reader --> Synthesizer: Findings
+    Synthesizer --> Critic: Synthesis
+    Critic --> Reporter: Quality ≥ 0.7
+    Critic --> Planner: Gaps Found
+    Reporter --> [*]: Final Report
+
+    note right of Critic
+        Evaluates coverage,
+        citation quality,
+        source diversity
+    end note
+```
+
+### State Schema
 
 ```python
 class AgentState(TypedDict):
@@ -176,24 +206,45 @@ Control research output format and constraints:
 }
 ```
 
-### SSE Events
+### SSE Event Flow
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as API Server
+    participant W as Worker
+
+    C->>API: POST /interactions
+    API-->>C: 202 {id: "int_abc123"}
+
+    C->>API: GET /stream
+    activate API
+
+    W->>API: interaction.start
+    API-->>C: event: interaction.start
+
+    loop Research Iterations
+        W->>API: thought_summary
+        API-->>C: event: thought_summary
+        W->>API: dag_state
+        API-->>C: event: dag_state
+        W->>API: content.delta
+        API-->>C: event: content.delta
+    end
+
+    W->>API: interaction.complete
+    API-->>C: event: interaction.complete
+    deactivate API
 ```
-event: interaction.start
-data: {"id": "int_abc123"}
 
-event: thought_summary
-data: {"text": "Decomposing query into 3 research tasks..."}
-
-event: dag_state
-data: {"nodes": [...], "edges": [...]}
-
-event: content.delta
-data: {"text": "## Executive Summary\n\n..."}
-
-event: interaction.complete
-data: {"status": "completed", "duration_seconds": 45.2}
-```
+**Event Types:**
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `interaction.start` | `{id}` | Research task started |
+| `thought_summary` | `{text}` | Agent reasoning step |
+| `dag_state` | `{nodes, edges}` | Current DAG state |
+| `content.delta` | `{text}` | Incremental report content |
+| `interaction.complete` | `{status, duration_seconds}` | Task finished |
 
 ### Python
 
@@ -290,12 +341,38 @@ See [`.env.example`](.env.example) for all configuration options.
 
 ## Observability
 
+```mermaid
+flowchart LR
+    subgraph App["DRX Application"]
+        Agents["Agent Spans"]
+        LLM["LLM Call Spans"]
+        Tools["Tool Spans"]
+    end
+
+    subgraph Collectors["Collectors"]
+        Phoenix["Phoenix :6006"]
+        Prom["Prometheus :9090"]
+    end
+
+    subgraph Dashboards["Dashboards"]
+        PhoenixUI["Trace Viewer"]
+        Grafana["Grafana :3000"]
+    end
+
+    Agents --> Phoenix
+    LLM --> Phoenix
+    Tools --> Phoenix
+    App -->|"/metrics"| Prom
+    Phoenix --> PhoenixUI
+    Prom --> Grafana
+```
+
 ### Phoenix (LLM Tracing)
 
 Access at http://localhost:6006 to view:
 - Full prompt/completion traces per agent
-- Token usage breakdown
-- Latency distribution
+- Token usage breakdown by model
+- Latency distribution across agents
 - Error analysis with stack traces
 
 ### Prometheus Metrics
@@ -304,16 +381,43 @@ Access at http://localhost:6006 to view:
 curl http://localhost:8000/metrics
 ```
 
-Key metrics:
-- `drx_tokens_total{agent, model, direction}` — Token consumption
-- `drx_agent_latency_seconds{agent}` — Agent execution time
-- `drx_sessions_active` — Concurrent research tasks
+| Metric | Labels | Description |
+|--------|--------|-------------|
+| `drx_tokens_total` | agent, model, direction | Token consumption |
+| `drx_agent_latency_seconds` | agent | Agent execution time |
+| `drx_sessions_active` | — | Concurrent research tasks |
+| `drx_tool_calls_total` | tool, status | Tool invocation count |
 
 ---
 
 ## Evaluation
 
 DRX uses [DeepEval](https://github.com/confident-ai/deepeval) and [Ragas](https://github.com/explodinggradients/ragas) for quality assessment.
+
+```mermaid
+flowchart LR
+    subgraph Input
+        Cases["Test Cases<br/>YAML"]
+    end
+
+    subgraph Runner["Evaluation Runner"]
+        API["DRX API"]
+        Collect["Result Collector"]
+    end
+
+    subgraph Metrics["Metric Frameworks"]
+        DE["DeepEval"]
+        RA["Ragas"]
+        CU["Custom"]
+    end
+
+    subgraph Output
+        JSON["metrics.json"]
+        MD["REPORT.md"]
+    end
+
+    Cases --> Runner --> Metrics --> Output
+```
 
 ### Metrics
 
@@ -382,6 +486,24 @@ docs/                # ARCHITECTURE.md, LLD.md
 ---
 
 ## Roadmap
+
+```mermaid
+gantt
+    title DRX Release Timeline
+    dateFormat YYYY-MM
+    axisFormat %b %Y
+
+    section Released
+    v1.0 Core orchestration       :done, v10, 2024-09, 30d
+    v1.1 Knowledge graph          :done, v11, after v10, 30d
+    v1.2 DAG visualization        :done, v12, after v11, 30d
+    v1.3 Citation verification    :done, v13, after v12, 30d
+    v1.4 Dataset flywheel         :done, v14, after v13, 30d
+
+    section Planned
+    v1.5 Deterministic replay     :active, v15, 2025-02, 45d
+    v2.0 Agent registry           :v20, after v15, 60d
+```
 
 | Version | Status | Focus |
 |---------|--------|-------|
