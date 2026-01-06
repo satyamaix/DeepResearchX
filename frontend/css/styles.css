@@ -488,6 +488,19 @@ input:focus, select:focus, textarea:focus {
     color: var(--text-primary);
 }
 
+/* Show header toggle buttons when sidebars are collapsed on desktop */
+.mobile-menu-btn.visible {
+    display: flex;
+}
+
+/* Also support :has() for browsers that support it (fallback) */
+@supports selector(:has(*)) {
+    body:has(.sidebar-left.collapsed) #toggle-left-sidebar,
+    body:has(.sidebar-right.collapsed) #toggle-right-sidebar {
+        display: flex;
+    }
+}
+
 /* Chat Container */
 .chat-container {
     flex: 1;

@@ -233,8 +233,20 @@ function initTheme() {
  */
 function toggleSidebar(side) {
     const sidebar = document.getElementById(`sidebar-${side}`);
+    const headerBtn = document.getElementById(`toggle-${side}-sidebar`);
+
     if (sidebar) {
+        const isCollapsing = !sidebar.classList.contains('collapsed');
         sidebar.classList.toggle('collapsed');
+
+        // Show/hide header button based on sidebar state
+        if (headerBtn) {
+            if (isCollapsing) {
+                headerBtn.classList.add('visible');
+            } else {
+                headerBtn.classList.remove('visible');
+            }
+        }
     }
 }
 
