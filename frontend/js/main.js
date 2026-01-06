@@ -678,12 +678,13 @@ function handleComplete(data) {
         }
     }
 
-    // Save to history
+    // Save to history (including knowledge graph if available)
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     DRXState.addToHistory({
         id: currentResearch?.id || Date.now().toString(),
         query: currentResearch?.query,
         report: reportContent,
+        knowledge_graph: currentKnowledgeGraph || null,
         status: 'completed',
         duration,
         timestamp: new Date().toISOString()
@@ -958,6 +959,60 @@ function showReportModal() {
             const duration = ((Date.now() - startTime) / 1000).toFixed(1);
             meta.textContent = `Duration: ${duration}s | Iterations: ${currentResearch?.iteration || '?'}`;
         }
+
+        // Initialize knowledge graph if data is available
+        initKnowledgeGraph();
+    }
+}
+
+/**
+ * Initialize knowledge graph visualization in the modal
+ */
+function initKnowledgeGraph() {
+    const graphSection = document.getElementById('graph-section');
+    const graphContainer = document.getElementById('graph-container');
+
+    if (!graphSection || !graphContainer) return;
+
+    // Check if we have knowledge graph data
+    if (currentKnowledgeGraph &&
+        ((currentKnowledgeGraph.nodes && currentKnowledgeGraph.nodes.length > 0) ||
+         (currentKnowledgeGraph.elements && currentKnowledgeGraph.elements.nodes))) {
+
+        graphSection.style.display = 'block';
+
+        // Initialize DRXGraph if available
+        if (typeof DRXGraph !== 'undefined') {
+            // Small delay to ensure modal is visible and container has dimensions
+            setTimeout(() => {
+                DRXGraph.init('graph-container');
+                DRXGraph.loadFromCytoscape(currentKnowledgeGraph);
+                console.log('[DRX] Knowledge graph visualization initialized');
+            }, 100);
+        } else {
+            console.warn('[DRX] DRXGraph module not available');
+        }
+    } else {
+        // Hide graph section if no data
+        graphSection.style.display = 'none';
+    }
+}
+
+/**
+ * Handle graph filter button click
+ * @param {HTMLElement} btn - The clicked filter button
+ */
+function handleGraphFilter(btn) {
+    const type = btn.dataset.type || '';
+
+    // Update active state on buttons
+    const buttons = document.querySelectorAll('.graph-filter-btn[data-type]');
+    buttons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Apply filter
+    if (typeof DRXGraph !== 'undefined') {
+        DRXGraph.filterByType(type ? [type] : []);
     }
 }
 
@@ -968,6 +1023,11 @@ function closeModal() {
     const modal = document.getElementById('report-modal');
     if (modal) {
         modal.classList.remove('active');
+    }
+
+    // Clean up graph when modal closes
+    if (typeof DRXGraph !== 'undefined') {
+        DRXGraph.hideDetailPanel();
     }
 }
 
@@ -1031,6 +1091,8 @@ function loadHistoryItem(id) {
 
     if (item?.report) {
         reportContent = item.report;
+        // Load knowledge graph from history if available
+        currentKnowledgeGraph = item.knowledge_graph || null;
         showReportModal();
     }
 }
