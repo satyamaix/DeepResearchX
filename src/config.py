@@ -231,6 +231,26 @@ class Settings(BaseSettings):
     )
 
     # =========================================================================
+    # OpenRouter Provider Routing
+    # =========================================================================
+
+    GEMINI_PROVIDER: str = Field(
+        default="google-ai-studio",
+        description=(
+            "Preferred provider for Gemini models. Options: 'google-ai-studio', 'google-vertex'. "
+            "Google AI Studio is recommended for most use cases."
+        ),
+    )
+
+    PROVIDER_ALLOW_FALLBACKS: bool = Field(
+        default=False,
+        description=(
+            "Allow fallback to other providers if preferred provider is unavailable. "
+            "Set to False to strictly use the specified provider."
+        ),
+    )
+
+    # =========================================================================
     # Web Search Settings (OpenRouter Native - Primary)
     # =========================================================================
 

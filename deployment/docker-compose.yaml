@@ -136,6 +136,9 @@ services:
       REASONING_MODEL: ${REASONING_MODEL:-deepseek/deepseek-r1}
       MAX_TOKENS_PER_REQUEST: ${MAX_TOKENS_PER_REQUEST:-100000}
       DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
+      # Provider routing (force Gemini to use Google AI Studio)
+      GEMINI_PROVIDER: ${GEMINI_PROVIDER:-google-ai-studio}
+      PROVIDER_ALLOW_FALLBACKS: ${PROVIDER_ALLOW_FALLBACKS:-false}
       # Research settings
       MAX_RESEARCH_ITERATIONS: ${MAX_RESEARCH_ITERATIONS:-5}
       MAX_SOURCES_PER_QUERY: ${MAX_SOURCES_PER_QUERY:-20}
@@ -230,6 +233,9 @@ services:
       REASONING_MODEL: ${REASONING_MODEL:-deepseek/deepseek-r1}
       MAX_TOKENS_PER_REQUEST: ${MAX_TOKENS_PER_REQUEST:-100000}
       DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
+      # Provider routing (force Gemini to use Google AI Studio)
+      GEMINI_PROVIDER: ${GEMINI_PROVIDER:-google-ai-studio}
+      PROVIDER_ALLOW_FALLBACKS: ${PROVIDER_ALLOW_FALLBACKS:-false}
       # Research settings
       MAX_RESEARCH_ITERATIONS: ${MAX_RESEARCH_ITERATIONS:-5}
       MAX_SOURCES_PER_QUERY: ${MAX_SOURCES_PER_QUERY:-20}

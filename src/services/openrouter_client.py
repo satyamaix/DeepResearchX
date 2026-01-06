@@ -326,6 +326,7 @@ class OpenRouterClient:
     ) -> dict[str, Any]:
         """Build the request body for chat completion."""
         model_config = self._get_model_config(model)
+        settings = get_settings()
 
         # Convert messages to dict format
         formatted_messages = []
@@ -343,6 +344,15 @@ class OpenRouterClient:
             "top_p": top_p if top_p is not None else model_config.top_p,
             "stream": stream,
         }
+
+        # Add provider preferences for Gemini models
+        # This forces routing to a specific provider (e.g., Google AI Studio over Vertex AI)
+        if "gemini" in model.lower():
+            body["provider"] = {
+                "order": [settings.GEMINI_PROVIDER],
+                "allow_fallbacks": settings.PROVIDER_ALLOW_FALLBACKS,
+            }
+            logger.debug(f"Using provider routing for Gemini: {settings.GEMINI_PROVIDER}")
 
         # Add optional parameters
         if tools and model_config.supports_tools:
