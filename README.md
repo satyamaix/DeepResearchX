@@ -12,6 +12,10 @@
 ## Table of Contents
 
 - [What is DRX?](#what-is-drx)
+- [Feature Status](#feature-status)
+  - [Core Features (Fully Implemented)](#core-features-fully-implemented)
+  - [Partially Implemented Features](#partially-implemented-features)
+  - [Future Planned Features](#future-planned-features)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
@@ -44,6 +48,139 @@ DRX (Deep Research X) is a **self-hosted, multi-agent research orchestration pla
 | **Full Observability** | Phoenix/Prometheus/Grafana | Limited | Limited | None |
 | **Knowledge Graph** | Entity-Relation visualization | No | No | No |
 | **Dataset Flywheel** | Continuous learning | No | No | No |
+
+---
+
+## Feature Status
+
+This section provides a precise breakdown of DRX features based on the [DRX.md architectural specification](../DRX.md), categorized by implementation status.
+
+### Core Features (Fully Implemented)
+
+These features are production-ready with complete implementation.
+
+#### Multi-Agent Orchestration
+
+| Feature | Implementation | Motivation |
+|---------|----------------|------------|
+| **LangGraph StateGraph** | `src/orchestrator/workflow.py` | Provides cyclic, stateful agent workflows essential for iterative deep research where initial findings necessitate new queries. Enables plan→search→read→synthesize→critique loops. |
+| **6 Specialized Agents** | `src/agents/*.py` | Separation of concerns: each agent has specialized prompts and can use different models. Planner (597 LOC), Searcher (632 LOC), Reader (766 LOC), Synthesizer (701 LOC), Critic (725 LOC), Reporter (693 LOC). |
+| **Shared State (AgentState)** | `src/orchestrator/state.py` | TypedDict-based state propagation between agents containing plan, findings, citations, synthesis, knowledge graph, gaps, and quality metrics. |
+| **Multi-Turn Iterative Refinement** | `should_continue` conditional edge | Critic identifies gaps → Orchestrator inserts new tasks → Loop continues until coverage threshold (0.7) or max iterations (5). Prevents premature termination on complex queries. |
+
+#### Checkpoint & Resume
+
+| Feature | Implementation | Motivation |
+|---------|----------------|------------|
+| **AsyncPostgresSaver** | `src/orchestrator/checkpointer.py` | Long-running research (minutes to hours) requires persistence. Every DAG node saves state to PostgreSQL, enabling pause/resume and crash recovery. |
+| **Resumable Streams** | SSE with `checkpoint_id` | Network drops happen. Frontend reconnects with `last_event_id` → backend loads checkpoint → resumes from exact failure point. Critical for regulated industries requiring auditability. |
+
+#### Observability Stack
+
+| Feature | Implementation | Motivation |
+|---------|----------------|------------|
+| **Phoenix LLM Tracing** | `src/observability/phoenix.py` | Full-trace logging of plans, DAG mutations, agent calls, tool invocations. OpenTelemetry spans with correlation IDs enable deep debugging. Required for explaining _why_ an agent made a decision. |
+| **OpenTelemetry Integration** | Auto-instrumentation | Traces DAG nodes (planner→searchers→synthesizers→critics) during live runs. Hierarchical spans: session→plan_node→tool→llm_call. |
+| **Prometheus Metrics** | `src/observability/metrics.py` | Time-series metrics for token usage, agent latency, error rates. Enables alerting on sudden drops in task success or spikes in tool errors. |
+
+#### Search & Retrieval
+
+| Feature | Implementation | Motivation |
+|---------|----------------|------------|
+| **OpenRouter Native Search** | `src/tools/openrouter_search.py` | Web search via `:online` model suffix (e.g., `gemini-3-flash-preview:online`). Cost-effective grounded search without separate API. |
+| **Tavily Search** | `src/tools/tavily_search.py` | Alternative web search for enhanced results. Explicit, tool-oriented queries with iterative expansion based on gaps. |
+| **pgvector RAG** | `src/services/vectorstore.py` | Internal memory index preventing context explosion. Hybrid search (semantic + keyword) over prior research sessions and uploaded documents. |
+
+#### API & Streaming
+
+| Feature | Implementation | Motivation |
+|---------|----------------|------------|
+| **Async Interaction Model** | `POST /api/v1/interactions` | Returns `interaction_id` immediately; job queued to Redis/Celery. Prevents browser timeouts on long research. Users can close tab and return later. |
+| **SSE Progress Streaming** | `GET /api/v1/interactions/{id}/stream` | Real-time events: `interaction.start`, `thought_summary`, `dag_state`, `content.delta`, `interaction.complete`. Enables responsive UI without polling. |
+| **Steerability Config** | `SteerabilityParams` in request | User-defined constraints: tone (technical/executive), format (markdown/table), max_sources, focus_areas, exclude_topics, preferred_domains. Matches Google Deep Research's steerability. |
+
+#### Knowledge Management
+
+| Feature | Implementation | Motivation |
+|---------|----------------|------------|
+| **Knowledge Graph (Entity-Relation-Claim)** | `src/models/knowledge.py` | Explicit argument graphs showing which sources support which claims and where disagreements exist. Essential for regulated industries where claim provenance matters. |
+| **Cytoscape.js Export** | `KnowledgeGraph.export_cytoscape()` | Frontend visualization of entities (person/org/concept), relations, and claims with confidence scores. Supports filtering by entity type. |
+| **Multi-Format Report Export** | `src/services/report_exporter.py` | Markdown, HTML, PDF, JSON outputs. Jinja2 templates with embedded knowledge graph SVG. WeasyPrint for PDF generation. |
+
+#### Quality Assurance
+
+| Feature | Implementation | Motivation |
+|---------|----------------|------------|
+| **Citation Verification** | `src/tools/citation_verifier.py` | URL accessibility check + fuzzy quote matching (threshold 0.85). Flags unsupported claims before final report. Reduces hallucination rate. |
+| **Bias Detection** | `src/tools/bias_detector.py` | Entropy-based diversity analysis: domain, source type, geographic, temporal. Detects political, commercial, sensational, selective bias indicators. |
+| **Coverage Scoring** | `QualityMetrics` in state | Tracks coverage_score, confidence, citation_density. Critic uses these to determine if research is complete or needs additional iterations. |
+
+---
+
+### Partially Implemented Features
+
+These features have foundational components but require additional work for full functionality.
+
+| Feature | Current State | Gap | Motivation |
+|---------|---------------|-----|------------|
+| **Tiered Model Selection** | OpenRouter client exists | Tier logic not implemented | Use smaller/cheaper models for high-volume tasks (search, extraction) and larger frontier models for planning, conflict resolution, final reporting. Cost optimization without quality loss. |
+| **Deterministic Replay** | Checkpoints exist | Replay endpoint missing | Debug and training support: re-execute from any checkpoint with identical inputs to reproduce issues. Required for RL/fine-tuning loop. |
+| **Policy/Safety Guard Agent** | Basic `check_policy` node | Full NeMo Guardrails integration missing | Enforce domain-specific policies, redact PII, refuse dangerous tasks. Rule-based + LLM assist for subtle cases. |
+| **Interactive DAG Editing** | API exposes plan | No PATCH endpoint for modification | User can see and edit the DAG mid-flight, pin requirements, lock/unlock nodes. Differentiator over consumer products. |
+| **Active State in Redis** | Redis client exists | Real-time metrics not implemented | Track token burn rate, error count, current context utilization per agent. Required for dynamic routing and circuit breaking. |
+| **Benchmark Integration** | Evaluation scenarios exist | Benchmark runners missing | Validate against HLE, BrowseComp, WebWalkerQA, xbench-DeepSearch. Measure parity with Tongyi/Gemini. |
+| **Custom Tool Hooks** | `BaseTool` interface exists | Hook registration system missing | Allow users to add custom tools (internal data, private APIs) with strict sandboxing and audit trails. |
+
+---
+
+### Future Planned Features
+
+These features are specified in DRX.md but not yet implemented. They represent the roadmap for v2.0+.
+
+#### Agentic Metadata Infrastructure
+
+| Feature | Description | Motivation |
+|---------|-------------|------------|
+| **Agent Registry (PostgreSQL)** | Formal metadata service storing agent definitions: capabilities, allowed tools, regulated domains, version, max_budget | Enables discovering agents by capability rather than hardcoding. Swap underlying models in registry without rewriting orchestration code. |
+| **Active State (Redis)** | Ephemeral metadata: current load, circuit breaker status, token burn rate | Real-time health monitoring for dynamic routing decisions. |
+| **Capability-Based Routing** | Query: "Find agent capable of `financial_analysis` with `compliance_level: high`" | Dynamic binding replaces hardcoded `call(ResearchAgent)`. Orchestrator queries registry, not agent directly. |
+| **Context Propagation** | Pass `context_id` + `summary_metadata` instead of full 100k context | Receiving agent checks relevance, fetches specific vector chunks. Reduces token costs for multi-agent handoffs. |
+| **Metadata Firewall** | Middleware interceptor checking metadata tags before every LLM/tool call | Block calls to blacklisted domains, enforce `allowed_domains` per agent. Write `policy_violation` events to trace. Critical for regulated industries. |
+| **Circuit Breaking** | Detect `duplicate_tool_calls > 3` or `token_usage_rate > threshold` | Flip agent status to `unhealthy`, auto-reroute to fallback model. Prevents infinite loops and hallucination spirals. |
+| **Agent Manifest (JSON Schema)** | Standard contract every agent must adhere to | Ensures interoperability, enables automated compliance checks. |
+
+#### Advanced Evaluation & Training
+
+| Feature | Description | Motivation |
+|---------|-------------|------------|
+| **RL/Fine-Tuning Loop** | Export traces in RLHF format, implement preference model | Learn from traces and user preferences: reward structures favoring high-quality sourcing, nuanced reasoning, correct ambiguity handling. |
+| **Metadata-Aware Evaluation** | Assertions like `trace.metadata.total_cost <= agent.max_budget` | Test compliance adherence using metadata, not just text output. |
+| **Trajectory Quality Metrics** | Measure steps, unnecessary tool calls, backtracks | Efficiency metrics beyond task success. Detect planning inefficiencies. |
+
+#### User Experience Enhancements
+
+| Feature | Description | Motivation |
+|---------|-------------|------------|
+| **Explain Reasoning Pane** | Show argument graphs and conflicting sources, not just citations | Build trust with users in regulated sectors. Transparency beyond raw logs. |
+| **Incremental Deliverables** | Quick "scouting report" after first iteration, deeper passes later | Users get value faster. Don't wait for full research completion. |
+| **Human-in-the-Loop Checkpoints** | Pause for user confirmation at critical decision points | Allow human override before costly research branches. |
+
+---
+
+### Implementation Coverage Summary
+
+Based on [GAP_ANALYSIS_REPORT.md](GAP_ANALYSIS_REPORT.md):
+
+| Category | Coverage | Notes |
+|----------|----------|-------|
+| **Core Architecture** | 100% | Orchestrator, state graph, checkpointing |
+| **Specialized Agents** | 100% | All 6 agents fully implemented (~4,100 LOC) |
+| **Execution Model** | 95% | DAG workflow, parallel execution, iterative refinement |
+| **Observability** | 100% | Phoenix, OpenTelemetry, Prometheus |
+| **API & Streaming** | 95% | REST, SSE, feedback endpoints |
+| **Evaluation** | 75% | DeepEval/Ragas integrated, benchmark runners pending |
+| **Agentic Metadata** | 25% | Schema exists, runtime features pending |
+| **Overall** | **~85%** | Production-ready for core research workflows |
 
 ---
 
