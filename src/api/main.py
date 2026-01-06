@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import close_redis_pool
+from src.api.replay_routes import router as replay_router
 from src.api.routes import ErrorResponse, router
 from src.config import Settings, get_settings
 from src.db.connection import close_pool as close_db_pool
@@ -74,6 +75,10 @@ TAGS_METADATA = [
     {
         "name": "research",
         "description": "Research interaction management",
+    },
+    {
+        "name": "replay",
+        "description": "Session replay and event recording",
     },
     {
         "name": "system",
@@ -420,6 +425,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Include routers
     app.include_router(router)
+    app.include_router(replay_router)
 
     # Add root redirect to docs
     @app.get("/", include_in_schema=False)
