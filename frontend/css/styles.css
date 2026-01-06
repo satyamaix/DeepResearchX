@@ -1050,6 +1050,11 @@ input:focus, select:focus, textarea:focus {
    Responsive Design
    ============================================================================ */
 
+/* Sidebar overlay for mobile - hidden by default */
+.sidebar-overlay {
+    display: none;
+}
+
 @media (max-width: 1200px) {
     .app-container {
         grid-template-columns: 1fr;
@@ -1076,6 +1081,19 @@ input:focus, select:focus, textarea:focus {
     .sidebar.open {
         transform: translateX(0);
         box-shadow: var(--shadow-lg);
+    }
+
+    /* Sidebar overlay for mobile */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: calc(var(--z-sidebar) - 1);
+    }
+
+    .sidebar-overlay.visible {
+        display: block;
     }
 
     .mobile-menu-btn {
