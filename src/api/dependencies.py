@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any, AsyncGenerator
 
 from fastapi import Depends, Header, HTTPException, Request, status
+import psycopg
+import redis.exceptions
 from redis.asyncio import ConnectionPool as RedisConnectionPool
 from redis.asyncio import Redis
 
@@ -47,7 +49,11 @@ async def get_db() -> AsyncGenerator[AsyncConnection[dict[str, Any]], None]:
     try:
         async with get_async_connection() as conn:
             yield conn
-    except Exception as e:
+    except HTTPException:
+        # Re-raise HTTP exceptions without wrapping
+        raise
+    except (ConnectionError, OSError, psycopg.OperationalError) as e:
+        # Only catch actual database connection errors
         logger.error(f"Database connection error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -111,7 +117,11 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
             yield client
         finally:
             await client.aclose()
-    except Exception as e:
+    except HTTPException:
+        # Re-raise HTTP exceptions without wrapping
+        raise
+    except (ConnectionError, OSError, redis.exceptions.ConnectionError) as e:
+        # Only catch actual Redis connection errors
         logger.error(f"Redis connection error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
