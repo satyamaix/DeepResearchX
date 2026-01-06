@@ -45,8 +45,9 @@ class PhoenixConfig:
     Configuration for Phoenix observability integration.
 
     Attributes:
-        collector_endpoint: OTLP collector endpoint (gRPC format).
+        collector_endpoint: OTLP collector endpoint (HTTP format: http://host:port/v1/traces).
         project_name: Phoenix project name for trace organization.
+        protocol: OTLP protocol - 'http/protobuf' (recommended) or 'grpc'.
         enable_auto_instrument: Whether to auto-instrument LangChain/LangGraph.
         service_name: OpenTelemetry service name for this application.
         service_version: Application version for trace metadata.
@@ -57,8 +58,9 @@ class PhoenixConfig:
         enabled: Master switch to enable/disable all tracing.
     """
 
-    collector_endpoint: str = "localhost:4317"
+    collector_endpoint: str = "http://localhost:6006/v1/traces"
     project_name: str = "drx-research"
+    protocol: str = "http/protobuf"  # 'http/protobuf' avoids TLS/SSL issues with plain gRPC
     enable_auto_instrument: bool = True
     service_name: str = "drx-deep-research"
     service_version: str = "1.0.0"
@@ -87,9 +89,10 @@ class PhoenixConfig:
         return cls(
             collector_endpoint=settings.PHOENIX_COLLECTOR_ENDPOINT,
             project_name=settings.PHOENIX_PROJECT_NAME,
+            protocol=getattr(settings, "PHOENIX_PROTOCOL", "http/protobuf"),
             enable_auto_instrument=True,
             deployment_environment=settings.APP_ENV,
-            enabled=True,
+            enabled=settings.PHOENIX_ENABLED,
         )
 
 
@@ -142,10 +145,14 @@ def setup_phoenix(config: PhoenixConfig | None = None) -> Tracer:
         from phoenix.otel import register
 
         # Register Phoenix tracer provider with OTLP exporter
-        # This automatically configures the global tracer provider
+        # Using HTTP/protobuf protocol to avoid SSL/TLS issues with plain gRPC
+        # Phoenix container serves plain gRPC without TLS, causing SSL handshake errors
+        # when using the default gRPC protocol which assumes TLS
         _tracer_provider = register(
             project_name=config.project_name,
             endpoint=config.collector_endpoint,
+            protocol=config.protocol,  # 'http/protobuf' or 'grpc'
+            batch=True,  # Use batch processing for better performance
         )
 
         logger.info(
@@ -153,6 +160,7 @@ def setup_phoenix(config: PhoenixConfig | None = None) -> Tracer:
             extra={
                 "endpoint": config.collector_endpoint,
                 "project": config.project_name,
+                "protocol": config.protocol,
             },
         )
 

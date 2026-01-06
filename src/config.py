@@ -310,8 +310,8 @@ class Settings(BaseSettings):
     )
 
     PHOENIX_COLLECTOR_ENDPOINT: str = Field(
-        default="localhost:4317",
-        description="Phoenix OTLP gRPC collector endpoint (format: host:port, no http:// prefix)",
+        default="http://localhost:6006/v1/traces",
+        description="Phoenix OTLP collector endpoint (HTTP format: http://host:port/v1/traces)",
     )
 
     PHOENIX_PROJECT_NAME: str = Field(
@@ -319,9 +319,9 @@ class Settings(BaseSettings):
         description="Project name in Phoenix",
     )
 
-    PHOENIX_GRPC_ENABLED: bool = Field(
-        default=True,
-        description="Use gRPC for Phoenix (faster than HTTP)",
+    PHOENIX_PROTOCOL: Literal["http/protobuf", "grpc"] = Field(
+        default="http/protobuf",
+        description="Phoenix OTLP protocol: 'http/protobuf' (recommended, no TLS issues) or 'grpc'",
     )
 
     # =========================================================================
