@@ -492,33 +492,60 @@ docs/                # ARCHITECTURE.md, LLD.md
 
 ## Roadmap
 
+### Development Timeline (24-Hour Sprint)
+
 ```mermaid
 gantt
-    title DRX Release Timeline
-    dateFormat YYYY-MM
-    axisFormat %b %Y
+    title DRX Development Timeline (Jan 5-6, 2026)
+    dateFormat HH:mm
+    axisFormat %H:%M
 
-    section Released
-    v1.0 Core orchestration       :done, v10, 2024-09, 30d
-    v1.1 Knowledge graph          :done, v11, after v10, 30d
-    v1.2 DAG visualization        :done, v12, after v11, 30d
-    v1.3 Citation verification    :done, v13, after v12, 30d
-    v1.4 Dataset flywheel         :done, v14, after v13, 30d
+    section Core System
+    Initial implementation        :done, 23:20, 30m
+    Integration fixes             :done, 23:43, 15m
+    Documentation foundation      :done, 00:04, 2h
 
-    section Planned
-    v1.5 Deterministic replay     :active, v15, 2025-02, 45d
-    v2.0 Agent registry           :v20, after v15, 60d
+    section Feature Completion
+    Tools (PDF, Citation, Bias)   :done, 09:40, 20m
+    Knowledge Graph + Workers     :done, 09:49, 15m
+    Parallel DAG + Export         :done, 10:00, 15m
+    UI (DAG viz, Argument Graph)  :done, 10:11, 15m
+
+    section Hardening
+    Security + Bug fixes          :done, 10:57, 35m
+    Phoenix + API fixes           :done, 11:19, 15m
+
+    section Evaluation
+    DeepEval/Ragas pipeline       :done, 12:33, 20m
+    Provider routing              :done, 12:52, 10m
+
+    section Documentation
+    README restructure            :done, 13:00, 30m
+    License + Synopsis            :done, 13:23, 10m
 ```
 
-| Version | Status | Focus |
-|---------|--------|-------|
-| v1.0 | Released | Core multi-agent orchestration |
-| v1.1 | Released | Knowledge graph + parallel execution |
-| v1.2 | Released | DAG visualization + argument graph UI |
-| v1.3 | Released | PDF extraction + citation verification |
-| v1.4 | Released | Dataset flywheel + feedback collection |
-| v1.5 | Planned | Deterministic replay + benchmark integration |
-| v2.0 | Planned | Agent registry + capability-based routing |
+### Milestones Achieved
+
+| Time (UTC+8) | Milestone | Key Commits |
+|--------------|-----------|-------------|
+| **23:20** | Core system complete | 6 agents, LangGraph orchestration, checkpointing |
+| **00:04** | Documentation + model config | README, ARCHITECTURE.md, OpenRouter setup |
+| **09:40** | Tool layer complete | PDF extraction, citation verification, bias detection |
+| **10:00** | Enterprise features | Parallel DAG execution, HTML/PDF export, Grafana dashboards |
+| **10:11** | Frontend complete | DAG visualization, argument graph modal, dataset flywheel |
+| **10:57** | Security hardening | SSRF protection, thread-safe budget tracking |
+| **12:33** | Evaluation pipeline | DeepEval/Ragas integration, 10 test scenarios |
+| **13:12** | Production-ready docs | IC9-level README with Mermaid diagrams |
+
+### Next Steps
+
+| Priority | Feature | Description |
+|----------|---------|-------------|
+| P0 | Deterministic replay | Re-execute from any checkpoint for debugging |
+| P0 | Benchmark integration | HLE, BrowseComp, WebWalkerQA validation |
+| P1 | Agent registry | Capability-based dynamic routing |
+| P1 | RLHF export | Training data pipeline from traces |
+| P2 | Human-in-the-loop | Pause for confirmation at decision points |
 
 ---
 
