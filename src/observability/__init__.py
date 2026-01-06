@@ -66,6 +66,39 @@ from src.observability.tracing import (
     async_trace_span,
 )
 
+from src.observability.metrics import (
+    # Metrics
+    TOKENS_TOTAL,
+    REQUEST_LATENCY,
+    SESSIONS_ACTIVE,
+    SESSIONS_TOTAL,
+    AGENT_EXECUTIONS,
+    AGENT_LATENCY,
+    LLM_CALLS_TOTAL,
+    LLM_LATENCY,
+    FINDINGS_TOTAL,
+    CITATIONS_TOTAL,
+    COST_TOTAL,
+    APP_INFO,
+    # Helper functions
+    track_tokens,
+    track_llm_call,
+    track_agent_execution,
+    track_session_start,
+    track_session_end,
+    track_finding,
+    track_citation,
+    track_request_latency,
+    track_agent_latency,
+    agent_metrics,
+    # Endpoint
+    get_metrics,
+    get_metrics_content_type,
+    set_app_info,
+    # Middleware
+    MetricsMiddleware,
+)
+
 __all__ = [
     # Phoenix Configuration
     "PhoenixConfig",
@@ -100,4 +133,34 @@ __all__ = [
     "TraceContext",
     "trace_span",
     "async_trace_span",
+    # Prometheus Metrics
+    "TOKENS_TOTAL",
+    "REQUEST_LATENCY",
+    "SESSIONS_ACTIVE",
+    "SESSIONS_TOTAL",
+    "AGENT_EXECUTIONS",
+    "AGENT_LATENCY",
+    "LLM_CALLS_TOTAL",
+    "LLM_LATENCY",
+    "FINDINGS_TOTAL",
+    "CITATIONS_TOTAL",
+    "COST_TOTAL",
+    "APP_INFO",
+    # Metrics Helper functions
+    "track_tokens",
+    "track_llm_call",
+    "track_agent_execution",
+    "track_session_start",
+    "track_session_end",
+    "track_finding",
+    "track_citation",
+    "track_request_latency",
+    "track_agent_latency",
+    "agent_metrics",
+    # Metrics Endpoint
+    "get_metrics",
+    "get_metrics_content_type",
+    "set_app_info",
+    # Metrics Middleware
+    "MetricsMiddleware",
 ]
