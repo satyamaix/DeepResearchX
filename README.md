@@ -1,6 +1,6 @@
 # DRX - Deep Research X
 
-**Enterprise-grade, self-hosted multi-agent research system with full observability and deterministic replay.**
+**Enterprise-grade, self-hosted multi-agent research system with full observability, deterministic replay, and continuous learning.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -15,6 +15,7 @@
 - [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
+- [Frontend Interface](#frontend-interface)
 - [API Reference](#api-reference)
 - [Configuration](#configuration)
 - [Project Structure](#project-structure)
@@ -40,7 +41,9 @@ DRX (Deep Research X) is a **self-hosted, multi-agent research orchestration pla
 | **Model Agnostic** | Any LLM via OpenRouter | Gemini only | GPT only | Limited models |
 | **Checkpoint/Resume** | Pause & continue | No | No | No |
 | **Deterministic Replay** | Debug & reproduce | No | No | No |
-| **Full Observability** | Phoenix/OpenTelemetry | Limited | Limited | None |
+| **Full Observability** | Phoenix/Prometheus/Grafana | Limited | Limited | None |
+| **Knowledge Graph** | Entity-Relation visualization | No | No | No |
+| **Dataset Flywheel** | Continuous learning | No | No | No |
 
 ---
 
@@ -48,161 +51,159 @@ DRX (Deep Research X) is a **self-hosted, multi-agent research orchestration pla
 
 ### Multi-Agent DAG Architecture
 
-DRX uses a transparent, auditable pipeline of six specialized agents:
+DRX uses a transparent, auditable pipeline of six specialized agents with parallel execution:
 
-| Agent | Role | Description |
-|-------|------|-------------|
-| **Planner** | Query Decomposition | Breaks complex queries into research sub-tasks with dependencies |
-| **Searcher** | Source Discovery | Discovers sources via web search (OpenRouter native or Tavily) |
-| **Reader** | Content Extraction | Extracts and structures information from sources |
-| **Synthesizer** | Information Synthesis | Aggregates findings, resolves conflicts, builds argument graphs |
-| **Critic** | Quality Assurance | Reviews quality, identifies gaps, triggers re-research iterations |
-| **Reporter** | Report Generation | Generates final deliverables with citations and references |
+```mermaid
+flowchart TB
+    subgraph Input["Input Layer"]
+        Query["User Query"]
+    end
 
-### Iterative Refinement Loop
+    subgraph Orchestration["LangGraph Orchestrator"]
+        Planner["Planner Agent"]
 
-The Critic agent analyzes research quality after each iteration and identifies knowledge gaps. Research continues until:
-- Coverage score meets the threshold (default: 0.7)
-- Maximum iterations reached (default: 5)
-- Token budget exhausted
+        subgraph ParallelSearch["Parallel Fan-Out"]
+            S1["Searcher 1"]
+            S2["Searcher 2"]
+            S3["Searcher N"]
+        end
+
+        subgraph ParallelRead["Parallel Fan-Out"]
+            R1["Reader 1"]
+            R2["Reader 2"]
+            R3["Reader N"]
+        end
+
+        Synthesizer["Synthesizer Agent"]
+        Critic["Critic Agent"]
+        Reporter["Reporter Agent"]
+    end
+
+    subgraph Output["Output Layer"]
+        Report["Final Report"]
+        KG["Knowledge Graph"]
+        Export["HTML/PDF Export"]
+    end
+
+    Query --> Planner
+    Planner --> ParallelSearch
+    ParallelSearch --> ParallelRead
+    ParallelRead --> Synthesizer
+    Synthesizer --> Critic
+    Critic -->|"Gaps"| Planner
+    Critic -->|"Complete"| Reporter
+    Reporter --> Report & KG & Export
+```
+
+| Agent | Role | Key Tools |
+|-------|------|-----------|
+| **Planner** | Query decomposition & DAG planning | - |
+| **Searcher** | Source discovery via web search | OpenRouter Native, Tavily, RAG |
+| **Reader** | Content extraction & structuring | PDF Extractor, HTML Parser |
+| **Synthesizer** | Information synthesis & conflict resolution | Knowledge Graph Builder |
+| **Critic** | Quality assurance & gap analysis | Citation Verifier, Bias Detector |
+| **Reporter** | Report generation & export | HTML/PDF Exporter |
 
 ### Enterprise Features
 
+- **Parallel DAG Execution**: Fan-out/fan-in patterns for concurrent task processing
+- **Knowledge Graph**: Entity-Relation-Claim visualization with Cytoscape.js
 - **Checkpoint & Resume**: Pause long research tasks and resume from any checkpoint
 - **Deterministic Replay**: Debug and reproduce any research run for auditing
 - **Circuit Breakers**: Automatic failover when agents or services degrade
 - **Policy Firewall**: Enforce domain restrictions, rate limits, and token budgets
-- **Full Observability**: Trace every LLM call with Phoenix/OpenTelemetry
+- **Budget Tracking**: Real-time token/cost monitoring with configurable limits
+- **Full Observability**: Phoenix traces, Prometheus metrics, Grafana dashboards
+- **Citation Verification**: URL accessibility and quote fuzzy matching
+- **Bias Detection**: Source diversity analysis and bias indicators
+- **Dataset Flywheel**: Continuous learning from user feedback
+- **Multi-format Export**: Markdown, HTML, PDF, JSON reports
 
 ---
 
 ## Architecture
 
-### Research Workflow
-
-```mermaid
-flowchart TD
-    subgraph Input
-        A[User Query] --> B[FastAPI]
-    end
-
-    subgraph Orchestrator["LangGraph Orchestrator"]
-        B --> C[Planner]
-        C --> D[Searcher]
-        D --> E[Reader]
-        E --> F[Synthesizer]
-        F --> G[Critic]
-        G --> H{Gaps Found?}
-        H -->|Yes| I[Continue Loop]
-        I --> D
-        H -->|No| J[Reporter]
-        J --> K[Final Report]
-    end
-
-    subgraph SharedState["Shared State (Redis)"]
-        L[(interaction:id)]
-        M[(events:id)]
-        N[(rate_limits)]
-    end
-
-    C <--> L
-    D <--> L
-    E <--> L
-    F <--> L
-    G <--> L
-    J <--> L
-    B <--> M
-
-    style SharedState fill:#f9f,stroke:#333,stroke-width:2px
-    style Orchestrator fill:#e1f5fe,stroke:#333,stroke-width:2px
-```
-
-### Infrastructure Architecture
+### System Overview
 
 ```mermaid
 flowchart TB
-    subgraph Client
-        U[User/Browser]
+    subgraph Clients["Client Layer"]
+        WebUI["Web UI"]
+        API_Client["REST/SSE Client"]
     end
 
-    subgraph API["FastAPI Server :8000"]
-        R[REST Endpoints]
-        S[SSE Streaming]
+    subgraph Gateway["API Gateway"]
+        FastAPI["FastAPI :8000"]
+        SSE["SSE Streaming"]
+        Feedback["Feedback Endpoint"]
     end
 
-    subgraph Orchestration["LangGraph Workflow"]
-        W[ResearchOrchestrator]
-        A1[Planner Agent]
-        A2[Searcher Agent]
-        A3[Reader Agent]
-        A4[Synthesizer Agent]
-        A5[Critic Agent]
-        A6[Reporter Agent]
+    subgraph Workers["Worker Layer"]
+        Celery["Celery Workers"]
+        Progress["Progress Publisher"]
     end
 
-    subgraph Storage
-        PG[(PostgreSQL 16<br/>+ pgvector)]
-        RD[(Valkey/Redis 7)]
+    subgraph Core["Core Orchestration"]
+        LangGraph["LangGraph StateGraph"]
+        ParallelExec["Parallel Executor"]
+        Budget["Budget Tracker"]
     end
 
-    subgraph External
-        OR[OpenRouter API<br/>100+ LLMs]
-        TV[Tavily Search<br/>Optional]
+    subgraph Agents["Agent Pool"]
+        Planner["Planner"]
+        Searcher["Searcher"]
+        Reader["Reader"]
+        Synthesizer["Synthesizer"]
+        Critic["Critic"]
+        Reporter["Reporter"]
     end
 
-    subgraph Observability
-        PH[Phoenix :6006<br/>LLM Tracing]
+    subgraph Tools["Tool Layer"]
+        Search["Web Search"]
+        PDF["PDF Extractor"]
+        RAG["RAG Retriever"]
+        Citation["Citation Verifier"]
+        Bias["Bias Detector"]
     end
 
-    U <-->|HTTP/SSE| R
-    U <-->|Events| S
-    R --> W
-    S <-->|Pub/Sub| RD
-    W --> A1 & A2 & A3 & A4 & A5 & A6
-    A1 & A2 & A3 & A4 & A5 & A6 -->|LLM Calls| OR
-    A2 -->|Web Search| TV
-    W <-->|Checkpoints| PG
-    W <-->|State| RD
-    A1 & A2 & A3 & A4 & A5 & A6 -->|Traces| PH
+    subgraph Knowledge["Knowledge Layer"]
+        KGraph["Knowledge Graph"]
+        VectorStore["Vector Store"]
+        ReportExport["Report Exporter"]
+    end
 
-    style Storage fill:#e8f5e9,stroke:#333
-    style Observability fill:#fff3e0,stroke:#333
-    style External fill:#fce4ec,stroke:#333
-```
+    subgraph Storage["Data Layer"]
+        Postgres[("PostgreSQL + pgvector")]
+        Redis[("Valkey/Redis")]
+    end
 
-### Redis Shared State Model
+    subgraph External["External Services"]
+        OpenRouter["OpenRouter API"]
+        Tavily["Tavily Search"]
+    end
 
-```mermaid
-erDiagram
-    INTERACTION_HASH {
-        string id PK "UUID"
-        string status "queued|running|completed|failed"
-        string query "Research question"
-        json result "Final report + findings"
-        string error "Error message if failed"
-        timestamp created_at "ISO 8601"
-    }
+    subgraph Observability["Observability"]
+        Phoenix["Phoenix :6006"]
+        Prometheus["Prometheus"]
+        Grafana["Grafana :3000"]
+    end
 
-    EVENT_CHANNEL {
-        string interaction_id FK
-        string event_type "start|delta|complete|error"
-        json payload "Event data"
-    }
+    subgraph Flywheel["Dataset Flywheel"]
+        Collector["Dataset Collector"]
+        FeedbackStore["Feedback Store"]
+    end
 
-    RATE_LIMIT_ZSET {
-        string identifier PK "user:id or ip:addr"
-        float timestamp "Request timestamp"
-        int cost "Request cost"
-    }
-
-    CIRCUIT_BREAKER {
-        string agent_id PK
-        string state "closed|open|half_open"
-        int failure_count
-        timestamp last_failure
-    }
-
-    INTERACTION_HASH ||--o{ EVENT_CHANNEL : "publishes"
+    Clients --> Gateway
+    Gateway --> Workers
+    Workers --> Core
+    Core --> Agents
+    Agents --> Tools
+    Tools --> Knowledge
+    Knowledge --> Storage
+    Agents --> External
+    Core --> Observability
+    Gateway --> Flywheel
+    Flywheel --> Storage
 ```
 
 ### Infrastructure Stack
@@ -211,10 +212,61 @@ erDiagram
 |-----------|------------|---------|
 | **Database** | PostgreSQL 16 + pgvector | Session state, checkpoints, vector embeddings |
 | **Cache/Queue** | Valkey 7 (Redis-compatible) | Real-time state, pub/sub, Celery broker |
-| **Observability** | Arize Phoenix | LLM tracing, token monitoring, latency tracking |
 | **API** | FastAPI + SSE | REST endpoints with real-time streaming |
+| **Workers** | Celery | Async task execution with progress streaming |
 | **Orchestration** | LangGraph | DAG workflow execution with checkpointing |
 | **LLM Gateway** | OpenRouter | Access to 100+ models (Gemini, Claude, GPT, DeepSeek) |
+| **Observability** | Phoenix, Prometheus, Grafana | LLM tracing, metrics, dashboards |
+| **Frontend** | Vanilla JS + D3.js + Cytoscape.js | DAG & Knowledge Graph visualization |
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as FastAPI
+    participant W as Celery Worker
+    participant O as Orchestrator
+    participant A as Agents
+    participant LLM as OpenRouter
+    participant DB as PostgreSQL
+    participant R as Redis
+
+    C->>API: POST /interactions
+    API->>DB: INSERT session
+    API->>W: Enqueue task
+    API-->>C: 202 Accepted {id}
+
+    C->>API: GET /stream
+    API->>R: SUBSCRIBE events:{id}
+
+    rect rgb(240, 248, 255)
+        Note over W,LLM: Async Worker Execution
+        W->>O: Start orchestration
+        O->>DB: Load checkpoint
+
+        loop For each DAG level
+            O->>A: Execute parallel tasks
+            A->>LLM: Generate completions
+            LLM-->>A: Responses
+            A->>R: PUBLISH progress events
+            R-->>API: Forward events
+            API-->>C: SSE: progress
+            A-->>O: Updated state
+            O->>DB: Save checkpoint
+        end
+
+        O->>DB: UPDATE status=completed
+        O->>R: PUBLISH complete
+    end
+
+    R-->>API: Complete event
+    API-->>C: SSE: complete
+    C->>API: GET /interactions/{id}
+    API->>DB: SELECT result
+    API-->>C: Final report + knowledge graph
+```
 
 ---
 
@@ -256,56 +308,95 @@ docker compose logs -f api
 ```
 
 **Services Started:**
+
 | Service | URL | Description |
 |---------|-----|-------------|
 | API | http://localhost:8000 | FastAPI REST endpoints |
-| Phoenix | http://localhost:6006 | Observability dashboard |
+| Frontend | http://localhost:8000 | Research UI |
+| Phoenix | http://localhost:6006 | LLM Observability |
+| Grafana | http://localhost:3000 | Metrics Dashboards |
 | PostgreSQL | localhost:5432 | Database |
-| Redis | localhost:6379 | Cache & queue |
+| Redis | localhost:6379 | Cache & Queue |
 
-### Step 3: Run Your First Research
+### Step 3: Open the Frontend
+
+Navigate to http://localhost:8000 to access the research interface with:
+- Real-time DAG visualization
+- Knowledge graph explorer
+- Research history
+- Feedback collection
+
+### Step 4: Run Your First Research (API)
 
 ```bash
 # Create a research interaction
 curl -X POST http://localhost:8000/api/v1/interactions \
   -H "Content-Type: application/json" \
-  -d '{"input": "What are the latest advancements in quantum computing and their impact on cryptography?"}'
+  -d '{"input": "What are the latest advancements in quantum computing?"}'
 ```
 
-**Response:**
-```json
-{
-  "id": "bee2698d-7146-47f8-810d-2ac6bd4f6b8c",
-  "status": "queued",
-  "created_at": "2026-01-05T19:53:34.405942Z",
-  "query": "What are the latest advancements in quantum computing...",
-  "result": null
-}
+---
+
+## Frontend Interface
+
+### DAG Visualization
+
+Real-time directed acyclic graph showing research workflow execution:
+
+```mermaid
+flowchart LR
+    subgraph DAGViz["DAG Visualization Component"]
+        direction TB
+        D3["D3.js Rendering"]
+        Nodes["Node States"]
+        Edges["Edge Animation"]
+        Controls["Zoom/Pan/Export"]
+    end
+
+    subgraph States["Node States"]
+        Pending["Pending (gray)"]
+        Running["Running (blue pulse)"]
+        Complete["Completed (green)"]
+        Failed["Failed (red)"]
+    end
+
+    subgraph SSE["Real-time Updates"]
+        Events["SSE Events"]
+        Update["State Updates"]
+    end
+
+    SSE --> DAGViz
+    DAGViz --> States
 ```
 
-### Step 4: Get Results
+### Knowledge Graph
 
-```bash
-# Poll for results (typically 30-60 seconds)
-curl http://localhost:8000/api/v1/interactions/{id}
+Interactive argument graph showing entities, relations, and claims:
 
-# Or stream real-time progress
-curl -N http://localhost:8000/api/v1/interactions/{id}/stream
-```
+```mermaid
+flowchart TB
+    subgraph GraphViz["Knowledge Graph Component"]
+        Cytoscape["Cytoscape.js"]
+        Filter["Entity Type Filters"]
+        Detail["Detail Panel"]
+        Tooltip["Citation Hovercards"]
+    end
 
-**Completed Response:**
-```json
-{
-  "id": "bee2698d-7146-47f8-810d-2ac6bd4f6b8c",
-  "status": "completed",
-  "result": {
-    "final_report": "# Research Report: Quantum Computing...",
-    "findings": [...],
-    "citations": [...],
-    "tokens_used": 696875,
-    "iteration_count": 5
-  }
-}
+    subgraph Entities["Entity Types"]
+        Person["Person (blue)"]
+        Org["Organization (green)"]
+        Concept["Concept (purple)"]
+        Claim["Claim (orange)"]
+    end
+
+    subgraph Claims["Claim Status"]
+        Supported["Supported (green)"]
+        Contested["Contested (yellow)"]
+        Refuted["Refuted (red)"]
+    end
+
+    GraphViz --> Entities
+    GraphViz --> Claims
 ```
 
 ---
@@ -314,7 +405,18 @@ curl -N http://localhost:8000/api/v1/interactions/{id}/stream
 
 ### Core Endpoints
 
-#### Create Research Interaction
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/interactions` | Create research interaction |
+| `GET` | `/api/v1/interactions` | List interactions |
+| `GET` | `/api/v1/interactions/{id}` | Get interaction details |
+| `GET` | `/api/v1/interactions/{id}/stream` | SSE progress stream |
+| `DELETE` | `/api/v1/interactions/{id}` | Cancel interaction |
+| `POST` | `/api/v1/interactions/{id}/resume` | Resume from checkpoint |
+| `POST` | `/api/v1/interactions/{id}/feedback` | Submit feedback |
+| `GET` | `/api/v1/interactions/{id}/feedback` | Get feedback |
+
+### Create Interaction
 
 ```http
 POST /api/v1/interactions
@@ -329,123 +431,40 @@ Content-Type: application/json
     "focus_areas": ["security", "performance"],
     "exclude_topics": ["marketing"],
     "preferred_domains": ["arxiv.org", "*.edu"],
-    "language": "en",
-    "custom_instructions": "Focus on peer-reviewed sources"
+    "language": "en"
   },
   "config": {
     "max_iterations": 5,
     "token_budget": 500000,
-    "timeout_seconds": 600,
-    "enable_citations": true,
-    "enable_quality_checks": true
+    "timeout_seconds": 600
   }
 }
 ```
 
-**Response:** `202 Accepted`
-```json
-{
-  "id": "uuid",
-  "status": "queued",
-  "created_at": "ISO8601",
-  "query": "..."
-}
-```
-
-#### Get Interaction Status
+### Submit Feedback
 
 ```http
-GET /api/v1/interactions/{interaction_id}
-```
-
-#### List Interactions
-
-```http
-GET /api/v1/interactions?page=1&page_size=20&status=completed
-```
-
-#### Stream Progress (SSE)
-
-```http
-GET /api/v1/interactions/{interaction_id}/stream
-Accept: text/event-stream
-```
-
-**Event Types:**
-- `interaction.start` - Research initiated
-- `thought_summary` - Agent thinking updates
-- `content.delta` - Incremental content
-- `tool.use` - Tool invocations
-- `interaction.complete` - Research finished
-- `interaction.error` - Error occurred
-
-#### Cancel Interaction
-
-```http
-DELETE /api/v1/interactions/{interaction_id}
-```
-
-#### Resume from Checkpoint
-
-```http
-POST /api/v1/interactions/{interaction_id}/resume
+POST /api/v1/interactions/{id}/feedback
 Content-Type: application/json
 
 {
-  "checkpoint_id": "chk_abc123"
+  "rating": 5,
+  "comment": "Comprehensive and well-cited",
+  "labels": ["accurate", "comprehensive", "well-structured"]
 }
 ```
 
-### Replay Endpoints
+### SSE Event Types
 
-#### Start Replay
-
-```http
-POST /api/v1/interactions/{interaction_id}/replay
-Content-Type: application/json
-
-{
-  "from_checkpoint": "chk_abc123",
-  "speed_multiplier": 1.0,
-  "modifications": {
-    "max_iterations": 3
-  }
-}
-```
-
-#### Get Recorded Events
-
-```http
-GET /api/v1/interactions/{interaction_id}/events?limit=100&offset=0
-```
-
-#### Compare Original vs Replay
-
-```http
-POST /api/v1/interactions/{interaction_id}/compare
-Content-Type: application/json
-
-{
-  "replay_session_id": "replay_xyz"
-}
-```
-
-### Health Check
-
-```http
-GET /api/v1/health
-```
-
-```json
-{
-  "status": "healthy",
-  "version": "1.0.0",
-  "timestamp": "ISO8601",
-  "checks": {
-    "database": "healthy",
-    "redis": "healthy"
-  }
-}
+```mermaid
+flowchart LR
+    Start["interaction.start"] --> Thought["thought_summary"]
+    Thought --> Tool["tool.use"]
+    Tool --> Content["content.delta"]
+    Content --> DAG["dag_state"]
+    DAG --> Checkpoint["checkpoint"]
+    Checkpoint --> Thought
+    Thought --> Complete["interaction.complete"]
 ```
 
 ---
@@ -454,136 +473,49 @@ GET /api/v1/health
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
-
 ```env
 # ============================================================================
 # REQUIRED
 # ============================================================================
-
-# OpenRouter API Key (get from https://openrouter.ai/keys)
 OPENROUTER_API_KEY=sk-or-v1-...
 
 # ============================================================================
-# DATABASE (PostgreSQL)
+# DATABASE
 # ============================================================================
-
 DATABASE_URL=postgresql://drx:drx_password@localhost:5432/drx
-DB_POOL_SIZE=10
-DB_POOL_MIN_SIZE=5
-DB_POOL_MAX_SIZE=20
 
 # ============================================================================
-# CACHE (Redis/Valkey)
+# CACHE
 # ============================================================================
-
 REDIS_URL=redis://localhost:6379/0
-REDIS_MAX_CONNECTIONS=50
 
 # ============================================================================
 # LLM MODELS
 # ============================================================================
-
-# Default model for general tasks
 DEFAULT_MODEL=google/gemini-3-flash-preview
-
-# Model for complex reasoning
 REASONING_MODEL=deepseek/deepseek-r1
-
-# Model for synthesis tasks
-SYNTHESIS_MODEL=anthropic/claude-3.5-sonnet
-
-# Temperature for generation (0.0-2.0)
-DEFAULT_TEMPERATURE=0.7
-
-# Max tokens per request
-MAX_TOKENS_PER_REQUEST=100000
-
-# ============================================================================
-# WEB SEARCH
-# ============================================================================
-
-# Search engine: native (OpenRouter :online), exa, or auto
-SEARCH_ENGINE=native
-
-# Model for search (append :online for native search)
 SEARCH_MODEL=google/gemini-3-flash-preview:online
 
-# Max results per search query
-SEARCH_MAX_RESULTS=5
-
 # ============================================================================
-# TAVILY (Optional Fallback)
+# BUDGET TRACKING
 # ============================================================================
-
-TAVILY_ENABLED=false
-TAVILY_API_KEY=tvly-...
-TAVILY_SEARCH_DEPTH=advanced
-TAVILY_MAX_RESULTS=10
+TOKEN_BUDGET_PER_SESSION=500000
+COST_BUDGET_PER_SESSION=1.00
 
 # ============================================================================
 # RESEARCH DEFAULTS
 # ============================================================================
-
-# Maximum research iterations (1-10)
 MAX_RESEARCH_ITERATIONS=5
-
-# Token budget per session (10k-2M)
-TOKEN_BUDGET_PER_SESSION=500000
-
-# Max sources to retrieve per query
 MAX_SOURCES_PER_QUERY=20
-
-# Minimum coverage score to complete (0.0-1.0)
 MIN_COVERAGE_SCORE=0.7
 
-# Research timeout in seconds
-DEFAULT_RESEARCH_TIMEOUT=600
-
 # ============================================================================
-# RATE LIMITING
+# OBSERVABILITY
 # ============================================================================
-
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_REQUESTS_PER_MINUTE=60
-RATE_LIMIT_TOKENS_PER_MINUTE=1000000
-
-# ============================================================================
-# OBSERVABILITY (Phoenix)
-# ============================================================================
-
 PHOENIX_ENABLED=true
 PHOENIX_COLLECTOR_ENDPOINT=http://localhost:4317
-PHOENIX_PROJECT_NAME=drx-research
-
-# ============================================================================
-# APPLICATION
-# ============================================================================
-
-APP_ENV=development
-DEBUG=true
-LOG_LEVEL=INFO
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# CORS allowed origins (comma-separated)
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
+PROMETHEUS_ENABLED=true
 ```
-
-### Steerability Options
-
-Control research output through the `steerability` parameter:
-
-| Option | Values | Description |
-|--------|--------|-------------|
-| `tone` | `executive`, `technical`, `casual` | Writing style of the report |
-| `format` | `markdown`, `markdown_table`, `json` | Output format |
-| `max_sources` | `1-100` | Maximum sources to cite |
-| `focus_areas` | `string[]` | Topics to emphasize |
-| `exclude_topics` | `string[]` | Topics to avoid |
-| `preferred_domains` | `string[]` | Preferred source domains |
-| `language` | `string` | Output language code |
-| `custom_instructions` | `string` | Additional guidance |
 
 ---
 
@@ -605,18 +537,38 @@ v1/
 │   │   ├── workflow.py         # ResearchOrchestrator & DAG execution
 │   │   ├── state.py            # AgentState TypedDict definitions
 │   │   ├── nodes.py            # Node functions & agent registry
+│   │   ├── parallel.py         # DAG parallel execution engine
+│   │   ├── budget.py           # Token/cost budget tracking
 │   │   └── checkpointer.py     # AsyncPostgresSaver integration
+│   │
+│   ├── models/                 # Data models
+│   │   ├── __init__.py         # Package exports
+│   │   └── knowledge.py        # Knowledge Graph (Entity, Relation, Claim)
 │   │
 │   ├── api/                    # FastAPI REST API
 │   │   ├── main.py             # Application factory & lifespan
-│   │   ├── routes.py           # Core research endpoints
+│   │   ├── routes.py           # Core research endpoints + feedback
 │   │   ├── replay_routes.py    # Replay & debugging endpoints
-│   │   ├── dependencies.py     # DI: DB, Redis, Orchestrator
-│   │   └── models.py           # Pydantic request/response models
+│   │   └── dependencies.py     # DI: DB, Redis, Orchestrator
 │   │
-│   ├── services/               # External service clients
+│   ├── services/               # Service layer
 │   │   ├── openrouter_client.py# LLM API with retry & streaming
-│   │   └── active_state.py     # Real-time metrics
+│   │   ├── vectorstore.py      # pgvector-backed vector store
+│   │   ├── report_exporter.py  # HTML/PDF report generation
+│   │   └── progress_publisher.py# Redis pub/sub progress streaming
+│   │
+│   ├── tools/                  # Agent tools
+│   │   ├── base.py             # BaseTool interface
+│   │   ├── openrouter_search.py# Native OpenRouter search
+│   │   ├── tavily_search.py    # Tavily web search
+│   │   ├── rag_retriever.py    # Vector retrieval
+│   │   ├── pdf_extractor.py    # PDF extraction (pypdf)
+│   │   ├── citation_verifier.py# Citation verification
+│   │   └── bias_detector.py    # Bias detection & diversity analysis
+│   │
+│   ├── observability/          # Observability
+│   │   ├── phoenix.py          # Phoenix/OpenTelemetry setup
+│   │   └── metrics.py          # Prometheus metrics
 │   │
 │   ├── metadata/               # Agentic metadata infrastructure
 │   │   ├── manifest.py         # Agent manifest schema
@@ -624,38 +576,45 @@ v1/
 │   │   ├── circuit_breaker.py  # Fault tolerance
 │   │   └── context.py          # Context propagation
 │   │
-│   ├── middleware/             # Policy enforcement
-│   │   ├── policy_firewall.py  # Domain, budget, rate limits
-│   │   └── domain_validator.py # URL validation
-│   │
-│   ├── replay/                 # Deterministic replay
-│   │   ├── recorder.py         # Event recording
-│   │   └── player.py           # Replay execution
-│   │
-│   ├── tools/                  # Agent tools
-│   │   ├── tavily_search.py    # Tavily web search
-│   │   ├── openrouter_search.py# Native OpenRouter search
-│   │   └── rag_retriever.py    # Vector retrieval
-│   │
-│   ├── db/                     # Database utilities
-│   │   └── connection.py       # Async connection pool
-│   │
 │   ├── config.py               # Pydantic settings
 │   └── worker.py               # Celery worker
 │
-├── schemas/                    # Data definitions
-│   ├── postgres_schema.sql     # Database DDL
-│   └── agent_manifest.json     # Agent manifest JSON Schema
+├── frontend/                   # Web UI
+│   ├── index.html              # Main HTML
+│   ├── js/
+│   │   ├── main.js             # Application entry
+│   │   ├── api.js              # API client
+│   │   ├── sse.js              # SSE handler
+│   │   ├── dag.js              # D3.js DAG visualization
+│   │   ├── graph.js            # Cytoscape.js knowledge graph
+│   │   └── state.js            # State management
+│   └── css/
+│       ├── styles.css          # Main styles
+│       ├── dag.css             # DAG visualization styles
+│       └── graph.css           # Knowledge graph styles
+│
+├── ci/evaluation/              # Evaluation & dataset flywheel
+│   ├── conftest.py             # Pytest fixtures
+│   ├── dataset_collector.py    # Training data collection
+│   ├── feedback_store.py       # User feedback storage
+│   ├── test_agent_evals.py     # DeepEval tests
+│   └── metadata_assertions.py  # Metadata compliance
 │
 ├── deployment/                 # Docker & infrastructure
-│   ├── docker-compose.yaml     # Full stack definition
+│   ├── docker-compose.yaml     # Development stack
+│   ├── docker-compose.prod.yaml# Production stack
 │   ├── Dockerfile.api          # API server image
 │   ├── Dockerfile.worker       # Celery worker image
-│   └── init.sql                # Database initialization
+│   ├── init.sql                # Database initialization
+│   └── grafana/                # Grafana dashboards
+│       ├── dashboards/
+│       │   ├── drx-overview.json
+│       │   └── drx-agents.json
+│       └── provisioning/
 │
-├── ci/evaluation/              # Evaluation pipeline
-│   ├── test_agent_evals.py     # DeepEval tests
-│   └── conftest.py             # Pytest fixtures
+├── docs/                       # Documentation
+│   ├── ARCHITECTURE.md         # System architecture
+│   └── LLD.md                  # Low-level design
 │
 ├── pyproject.toml              # Dependencies & build config
 ├── .env.example                # Environment template
@@ -680,9 +639,6 @@ pip install -e ".[dev,eval]"
 cd deployment
 docker compose up -d postgres redis phoenix
 
-# Initialize database
-docker exec -i drx-postgres psql -U drx -d drx < ../schemas/postgres_schema.sql
-
 # Run API server with hot reload
 cd ..
 uvicorn src.api.main:app --reload --port 8000
@@ -693,7 +649,6 @@ uvicorn src.api.main:app --reload --port 8000
 ```bash
 # Linting
 ruff check .
-ruff check . --fix
 
 # Type checking
 mypy src/
@@ -701,76 +656,15 @@ mypy src/
 # Run tests
 pytest tests/ -v
 
-# Run with coverage
-pytest tests/ --cov=src --cov-report=html
-
-# Pre-commit hooks
-pre-commit install
-pre-commit run --all-files
+# Run evaluations
+pytest ci/evaluation/ -v
 ```
-
-### Adding a New Agent
-
-1. Create `src/agents/my_agent.py`:
-
-```python
-from .base import BaseAgent, AgentResponse
-
-class MyAgent(BaseAgent):
-    @property
-    def name(self) -> str:
-        return "my_agent"
-
-    @property
-    def description(self) -> str:
-        return "Description of what this agent does"
-
-    @property
-    def agent_type(self) -> str:
-        return "my_agent"
-
-    @property
-    def system_prompt(self) -> str:
-        return "You are an expert at..."
-
-    async def _process(self, state: AgentState) -> AgentResponse:
-        # Your agent logic here
-        result = await self._call_llm(user_message)
-        return AgentResponse.success_response(
-            data=result.data,
-            agent_name=self.name,
-            tokens_used=result.tokens_used
-        )
-```
-
-2. Register in `src/orchestrator/nodes.py`:
-
-```python
-elif agent_type == "my_agent":
-    from src.agents.my_agent import MyAgent
-    _agents[agent_type] = MyAgent(llm_client=llm_client)
-```
-
-3. Add to workflow in `src/orchestrator/workflow.py`
 
 ---
 
 ## Evaluation
 
-DRX includes an evaluation pipeline using DeepEval and Ragas:
-
-```bash
-# Run all evaluations
-pytest ci/evaluation/ -v
-
-# Run CI gate tests only
-pytest ci/evaluation/ -m ci_gate -v
-
-# Run with detailed output
-pytest ci/evaluation/ -v --tb=long
-```
-
-### Evaluation Metrics
+DRX includes comprehensive evaluation with DeepEval and Ragas:
 
 | Metric | Target | Description |
 |--------|--------|-------------|
@@ -780,76 +674,31 @@ pytest ci/evaluation/ -v --tb=long
 | **Policy Violations** | == 0 | Domain/budget violations |
 | **Coverage Score** | >= 0.7 | Research completeness |
 
----
+### Dataset Flywheel
 
-## Troubleshooting
+User feedback is collected and used for continuous improvement:
 
-### Common Issues
-
-**1. Database connection errors**
-```bash
-# Check PostgreSQL is running
-docker compose ps postgres
-docker compose logs postgres
-
-# Verify connection
-docker exec -it drx-postgres psql -U drx -d drx -c "SELECT 1"
-```
-
-**2. Redis connection errors**
-```bash
-# Check Valkey is running
-docker compose ps redis
-docker exec -it drx-redis valkey-cli ping
-```
-
-**3. OpenRouter API errors**
-```bash
-# Verify API key
-curl https://openrouter.ai/api/v1/models \
-  -H "Authorization: Bearer $OPENROUTER_API_KEY"
-```
-
-**4. Workflow not executing**
-```bash
-# Check API logs
-docker compose logs api -f
-
-# Verify orchestrator initialized
-curl http://localhost:8000/api/v1/health
-```
-
-### Useful Commands
-
-```bash
-# Restart all services
-docker compose restart
-
-# Rebuild after code changes
-docker compose build api --no-cache
-docker compose up -d api
-
-# View real-time logs
-docker compose logs -f api
-
-# Access PostgreSQL
-docker exec -it drx-postgres psql -U drx -d drx
-
-# Access Redis CLI
-docker exec -it drx-redis valkey-cli
-
-# Check Phoenix traces
-open http://localhost:6006
+```mermaid
+flowchart LR
+    Research["Research Session"] --> Feedback["User Feedback"]
+    Feedback --> Collector["Dataset Collector"]
+    Collector --> Quality["Quality Tiers"]
+    Quality --> Export["Training Export"]
+    Export --> FineTune["Fine-tuning"]
+    FineTune --> Improve["Improved Models"]
+    Improve --> Research
 ```
 
 ---
 
 ## Roadmap
 
-- [ ] **v1.1**: Enhanced Tavily integration with fallback chain
-- [ ] **v1.2**: Interactive DAG editing UI
-- [ ] **v1.3**: Multi-modal research (images, PDFs)
-- [ ] **v1.4**: RLHF fine-tuning pipeline export
+- [x] **v1.0**: Core multi-agent research system
+- [x] **v1.1**: Knowledge Graph & parallel execution
+- [x] **v1.2**: DAG visualization & argument graph UI
+- [x] **v1.3**: PDF extraction & citation verification
+- [x] **v1.4**: Dataset flywheel & feedback collection
+- [ ] **v1.5**: RLHF fine-tuning pipeline export
 - [ ] **v2.0**: Hierarchical multi-agent orchestration
 
 ---
@@ -857,12 +706,6 @@ open http://localhost:6006
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-## Contributing
-
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting PRs.
 
 ---
 
@@ -874,4 +717,5 @@ Built with:
 - [DeepEval](https://github.com/confident-ai/deepeval) - Evaluation framework
 - [OpenRouter](https://openrouter.ai) - LLM gateway
 - [FastAPI](https://fastapi.tiangolo.com) - API framework
-- [Pydantic](https://docs.pydantic.dev) - Data validation
+- [D3.js](https://d3js.org) - DAG visualization
+- [Cytoscape.js](https://js.cytoscape.org) - Knowledge graph visualization
