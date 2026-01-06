@@ -101,11 +101,13 @@ SOURCE_TYPE_PATTERNS: dict[str, list[str]] = {
 }
 
 # Geographic indicators in domains
+# NOTE: .com, .org, .net, .io are global TLDs and should NOT be attributed to any region
 GEO_INDICATORS: dict[str, list[str]] = {
-    "us": [".com", ".us", ".edu"],
-    "uk": [".co.uk", ".ac.uk", ".gov.uk"],
-    "eu": [".eu", ".de", ".fr", ".nl", ".es", ".it"],
-    "asia": [".cn", ".jp", ".kr", ".in", ".sg"],
+    "us": [".us", ".edu", ".gov"],  # US-specific TLDs only
+    "uk": [".co.uk", ".ac.uk", ".gov.uk", ".uk"],
+    "eu": [".eu", ".de", ".fr", ".nl", ".es", ".it", ".be", ".at", ".ch", ".pl"],
+    "asia": [".cn", ".jp", ".kr", ".in", ".sg", ".hk", ".tw", ".th", ".vn"],
+    "international": [".com", ".org", ".net", ".io", ".info", ".biz"],  # Global TLDs
     "other": [],
 }
 
@@ -486,7 +488,13 @@ class BiasDetector:
     def _analyze_geographic_diversity(
         self, citations: list[CitationRecord]
     ) -> Counter[str]:
-        """Analyze geographic distribution of sources."""
+        """
+        Analyze geographic distribution of sources.
+
+        Note: International TLDs (.com, .org, .net, .io) are tracked separately
+        and treated as geographically neutral. They contribute to diversity but
+        are not counted as belonging to any specific region for bias detection.
+        """
         geo_counts: Counter[str] = Counter()
 
         for c in citations:
@@ -494,7 +502,11 @@ class BiasDetector:
             domain = c.get("domain", "").lower()
 
             classified = False
-            for region, indicators in GEO_INDICATORS.items():
+            # Check regional TLDs first (more specific), then international
+            # Order matters: check country-specific TLDs before generic ones
+            check_order = ["uk", "eu", "asia", "us", "international", "other"]
+            for region in check_order:
+                indicators = GEO_INDICATORS.get(region, [])
                 for ind in indicators:
                     if ind in domain or ind in url:
                         geo_counts[region] += 1
@@ -582,12 +594,29 @@ class BiasDetector:
                 "Consider including both recent and historical sources."
             )
 
+        # Calculate regional bias excluding international TLDs (which are geographically neutral)
+        # Only count truly region-specific sources for geographic bias assessment
+        regional_sources = {
+            k: v for k, v in geo_distribution.items()
+            if k not in ("international", "unknown", "other")
+        }
+        total_regional = sum(regional_sources.values())
+        international_count = geo_distribution.get("international", 0)
+
+        if total_regional > 0:
+            us_ratio = regional_sources.get("us", 0) / total_regional
+            if us_ratio > 0.8 and total_regional >= 3:
+                recommendations.append(
+                    f"Regional sources are heavily US-centric ({us_ratio:.0%} of {total_regional} regional sources). "
+                    "Consider adding sources from other regions."
+                )
+
+        # Also check if there's very low regional diversity (all international TLDs)
         total_geo = sum(geo_distribution.values())
-        us_ratio = geo_distribution.get("us", 0) / max(total_geo, 1)
-        if us_ratio > 0.8:
+        if total_geo > 5 and total_regional == 0 and international_count > 0:
             recommendations.append(
-                f"Sources are heavily US-centric ({us_ratio:.0%}). "
-                "Consider adding international perspectives."
+                "All sources use international TLDs (.com, .org, etc.). "
+                "Consider adding region-specific sources for geographic perspective diversity."
             )
 
         return recommendations
