@@ -3,7 +3,7 @@
 **Self-hosted multi-agent research orchestration with full observability and checkpoint/resume.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.0+-green.svg)](https://github.com/langchain-ai/langgraph)
 
 ---
@@ -544,4 +544,6 @@ gantt
 
 ## License
 
-MIT — See [LICENSE](LICENSE)
+This work is licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — See [LICENSE](LICENSE)
+
+You are free to share and adapt this work for non-commercial purposes with attribution.
