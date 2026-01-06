@@ -76,6 +76,17 @@ from .citation_verifier import (
     create_citation_verifier,
 )
 
+from .bias_detector import (
+    BiasDetector,
+    BiasIndicator,
+    DiversityReport,
+    ViewpointAssessment,
+    BiasReport,
+    BiasType,
+    SeverityLevel,
+    create_bias_detector,
+)
+
 __all__ = [
     # Base classes and types
     "BaseTool",
@@ -126,4 +137,13 @@ __all__ = [
     "QuoteVerification",
     "VerificationResult",
     "create_citation_verifier",
+    # Bias detector
+    "BiasDetector",
+    "BiasIndicator",
+    "DiversityReport",
+    "ViewpointAssessment",
+    "BiasReport",
+    "BiasType",
+    "SeverityLevel",
+    "create_bias_detector",
 ]
