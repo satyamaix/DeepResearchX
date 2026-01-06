@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-01-06T04:41:31+08:00",
+  "services": {
+    "drx-api": "healthy",
+    "drx-worker": "healthy",
+    "drx-postgres": "healthy",
+    "drx-redis": "healthy",
+    "drx-phoenix": "healthy"
+  },
+  "all_healthy": true,
+  "provider_routing_active": true,
+  "restart_time_seconds": 92,
+  "issues": [],
+  "environment_verified": {
+    "GEMINI_PROVIDER": "google-ai-studio",
+    "DEFAULT_MODEL": "google/gemini-3-flash-preview",
+    "PROVIDER_ALLOW_FALLBACKS": "false"
+  },
+  "notes": [
+    "All core services (api, worker, postgres, redis, phoenix) are healthy",
+    "GEMINI_PROVIDER=google-ai-studio environment variable confirmed in both api and worker containers",
+    "nginx service is unhealthy but not part of core DRX services",
+    "Provider routing configuration successfully loaded"
+  ]
+}

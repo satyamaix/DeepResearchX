@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-01-06T04:43:20.195715Z",
+  "root_healthy": true,
+  "root_response": {
+    "name": "DRX Deep Research API",
+    "version": "1.0.0",
+    "docs": "/docs",
+    "health": "/api/v1/health"
+  },
+  "health_endpoint": true,
+  "health_response": {
+    "status": "healthy",
+    "version": "1.0.0",
+    "timestamp": "2026-01-06T04:42:30.770034Z",
+    "checks": {
+      "database": {
+        "status": "healthy",
+        "latency_ms": 0
+      },
+      "redis": {
+        "status": "healthy"
+      }
+    }
+  },
+  "interactions_endpoint": false,
+  "interactions_endpoint_error": "Database schema issue: column 'error' does not exist in interactions table (GET returns 500)",
+  "sample_request_success": true,
+  "sample_interaction_id": "7cfc5c79-13ed-4efe-95bd-b5cfe11036e1",
+  "sample_request_status": "queued",
+  "sample_request_query": "What is 2+2? Please explain the mathematical operation.",
+  "latency_ms": 18,
+  "issues": [
+    "GET /api/v1/interactions returns 500 due to missing 'error' column in database schema",
+    "Database migration may be required to add 'error' column to interactions table"
+  ],
+  "endpoints_tested": {
+    "GET /": {
+      "status_code": 200,
+      "latency_ms": 3.306,
+      "healthy": true
+    },
+    "GET /api/v1/health": {
+      "status_code": 200,
+      "latency_ms": 8.828,
+      "healthy": true
+    },
+    "GET /api/v1/interactions": {
+      "status_code": 500,
+      "latency_ms": 21.788,
+      "healthy": false,
+      "error": "psycopg.errors.UndefinedColumn: column 'error' does not exist"
+    },
+    "POST /api/v1/interactions": {
+      "status_code": 202,
+      "latency_ms": 18,
+      "healthy": true
+    }
+  }
+}

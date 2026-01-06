@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-01-06T12:00:00Z",
+  "openrouter_configured": true,
+  "gemini_provider": "google-ai-studio",
+  "provider_allow_fallbacks": false,
+  "venv_valid": true,
+  "evaluation_files_exist": true,
+  "validation_passed": true,
+  "issues": [],
+  "details": {
+    "openrouter_api_key": "sk-or-v1-***redacted*** (configured in .env)",
+    "gemini_provider_source": "src/config.py:GEMINI_PROVIDER default='google-ai-studio'",
+    "provider_allow_fallbacks_source": "src/config.py:PROVIDER_ALLOW_FALLBACKS default=False",
+    "venv_packages": {
+      "httpx": "0.28.1",
+      "pyyaml": "installed"
+    },
+    "evaluation_files": {
+      "curated_test_cases.yaml": "/home/cycx/Documents/DeepResearch/v1/ci/evaluation/curated_test_cases.yaml",
+      "run_evaluation.py": "/home/cycx/Documents/DeepResearch/v1/ci/evaluation/run_evaluation.py"
+    },
+    "lsp_diagnostics": {
+      "src/config.py": "no errors",
+      "ci/evaluation/run_evaluation.py": "no errors"
+    }
+  }
+}

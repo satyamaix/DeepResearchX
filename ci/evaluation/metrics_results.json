@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-01-06T05:00:00.000000+00:00",
+  "deepeval": {
+    "computed": false,
+    "reason": "All outputs are empty - planner generated 0 tasks",
+    "faithfulness_avg": null,
+    "hallucination_avg": null,
+    "answer_relevancy_avg": null
+  },
+  "ragas": {
+    "computed": false,
+    "reason": "No retrieval context available - all scenarios returned empty",
+    "context_precision": null,
+    "context_recall": null
+  },
+  "task_completion": {
+    "computed": true,
+    "total_scenarios": 10,
+    "with_output": 0,
+    "without_output": 10,
+    "task_completion_rate": 0.0
+  },
+  "policy_compliance": {
+    "computed": true,
+    "negative_tests": 2,
+    "blocked": 0,
+    "policy_enforcement_rate": 0.0
+  }
+}
