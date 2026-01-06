@@ -71,6 +71,31 @@ from src.services.openrouter_client import (
     OpenRouterTimeoutError,
 )
 
+from src.services.progress_publisher import (
+    # Main class
+    ProgressPublisher,
+    # Factory function
+    create_progress_publisher,
+    # Cancellation support
+    request_cancellation,
+    is_cancelled,
+    clear_cancellation,
+)
+
+from src.services.vectorstore import (
+    # Main class
+    VectorStore,
+    # Factory functions
+    create_vectorstore,
+    get_vectorstore,
+    # Type definitions
+    Document as VectorDocument,
+    SearchResult as VectorSearchResult,
+    CollectionStats,
+    # Embedding provider
+    EmbeddingProvider,
+)
+
 
 __all__ = [
     # Redis
@@ -103,4 +128,18 @@ __all__ = [
     "OpenRouterAuthError",
     "OpenRouterAPIError",
     "OpenRouterTimeoutError",
+    # Progress Publisher
+    "ProgressPublisher",
+    "create_progress_publisher",
+    "request_cancellation",
+    "is_cancelled",
+    "clear_cancellation",
+    # Vector Store
+    "VectorStore",
+    "create_vectorstore",
+    "get_vectorstore",
+    "VectorDocument",
+    "VectorSearchResult",
+    "CollectionStats",
+    "EmbeddingProvider",
 ]
