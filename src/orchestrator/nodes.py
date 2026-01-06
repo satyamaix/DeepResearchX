@@ -32,6 +32,7 @@ from src.orchestrator.state import (
     AgentState,
     Finding,
     CitationRecord,
+    KnowledgeGraphState,
     QualityMetrics,
     ResearchPlan,
     SubTask,
@@ -361,12 +362,13 @@ async def synthesize_findings(state: AgentState) -> NodeResult:
     - Combines findings from multiple sources
     - Identifies patterns and themes
     - Creates a preliminary synthesis
+    - Builds knowledge graph from entities, relations, and claims
 
     Args:
         state: Current workflow state.
 
     Returns:
-        Partial state update with synthesis text.
+        Partial state update with synthesis text and knowledge graph.
     """
     logger.info(f"[{state['session_id']}] Synthesizing findings...")
 
@@ -387,15 +389,22 @@ async def synthesize_findings(state: AgentState) -> NodeResult:
 
         token_update = update_tokens_used(state, tokens)
 
+        # Extract knowledge graph from synthesizer result if available
+        # The synthesizer may build a KnowledgeGraph internally; we serialize it
+        # for checkpointing compatibility with AsyncPostgresSaver
+        knowledge_graph_update = _extract_knowledge_graph(result, state)
+
         logger.info(
             f"[{state['session_id']}] Synthesis complete: "
-            f"{len(synthesis)} characters"
+            f"{len(synthesis)} characters, "
+            f"KG: {len(knowledge_graph_update.get('knowledge_graph', {}).get('entities', []))} entities"
         )
 
         return {
             "synthesis": synthesis,
             "messages": messages,
             "current_phase": "critiquing",
+            **knowledge_graph_update,
             **token_update,
         }
 
@@ -787,6 +796,102 @@ async def parallel_node_execution(
                 merged[key] = value
 
     return merged
+
+
+# =============================================================================
+# Knowledge Graph Extraction
+# =============================================================================
+
+
+def _extract_knowledge_graph(
+    result: dict[str, Any],
+    state: AgentState,
+) -> dict[str, KnowledgeGraphState]:
+    """
+    Extract knowledge graph from synthesizer result and serialize for checkpointing.
+
+    The synthesizer agent may return a KnowledgeGraph object or raw entity/relation
+    data. This function normalizes the output into a KnowledgeGraphState TypedDict
+    that can be checkpointed by AsyncPostgresSaver.
+
+    Args:
+        result: Result from synthesizer agent invoke()
+        state: Current workflow state (for merging with existing KG)
+
+    Returns:
+        Dict containing the updated knowledge_graph field
+    """
+    # Get existing knowledge graph from state (or empty if first synthesis)
+    existing_kg = state.get("knowledge_graph", {
+        "entities": [],
+        "relations": [],
+        "claims": [],
+    })
+
+    # Extract knowledge graph from result
+    # The synthesizer may provide:
+    # 1. A "knowledge_graph" key with serialized data
+    # 2. An "_kg" or "kg" key with a KnowledgeGraph object
+    # 3. Separate "entities", "relations", "claims" keys
+    new_entities: list = []
+    new_relations: list = []
+    new_claims: list = []
+
+    if "knowledge_graph" in result:
+        kg_data = result["knowledge_graph"]
+        if isinstance(kg_data, dict):
+            new_entities = kg_data.get("entities", [])
+            new_relations = kg_data.get("relations", [])
+            new_claims = kg_data.get("claims", [])
+        elif hasattr(kg_data, "_entities"):
+            # It's a KnowledgeGraph object - extract values
+            new_entities = list(kg_data._entities.values())
+            new_relations = list(kg_data._relations.values())
+            new_claims = list(kg_data._claims.values())
+
+    elif "_kg" in result or "kg" in result:
+        kg_obj = result.get("_kg") or result.get("kg")
+        if hasattr(kg_obj, "_entities"):
+            new_entities = list(kg_obj._entities.values())
+            new_relations = list(kg_obj._relations.values())
+            new_claims = list(kg_obj._claims.values())
+
+    elif "entities" in result or "relations" in result or "claims" in result:
+        new_entities = result.get("entities", [])
+        new_relations = result.get("relations", [])
+        new_claims = result.get("claims", [])
+
+    # Merge with existing, avoiding duplicates by ID
+    existing_entity_ids = {e["id"] for e in existing_kg.get("entities", [])}
+    existing_relation_ids = {r["id"] for r in existing_kg.get("relations", [])}
+    existing_claim_ids = {c["id"] for c in existing_kg.get("claims", [])}
+
+    merged_entities = list(existing_kg.get("entities", []))
+    merged_relations = list(existing_kg.get("relations", []))
+    merged_claims = list(existing_kg.get("claims", []))
+
+    for entity in new_entities:
+        if entity.get("id") not in existing_entity_ids:
+            merged_entities.append(entity)
+            existing_entity_ids.add(entity["id"])
+
+    for relation in new_relations:
+        if relation.get("id") not in existing_relation_ids:
+            merged_relations.append(relation)
+            existing_relation_ids.add(relation["id"])
+
+    for claim in new_claims:
+        if claim.get("id") not in existing_claim_ids:
+            merged_claims.append(claim)
+            existing_claim_ids.add(claim["id"])
+
+    return {
+        "knowledge_graph": KnowledgeGraphState(
+            entities=merged_entities,
+            relations=merged_relations,
+            claims=merged_claims,
+        )
+    }
 
 
 # =============================================================================
