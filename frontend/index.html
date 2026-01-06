@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DRX - Deep Research X</title>
+    <meta name="description" content="Enterprise-grade multi-agent research system">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/dag.css">
+    <link rel="stylesheet" href="css/graph.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Sidebar: Model & Agent Configuration -->
+        <aside class="sidebar sidebar-left" id="sidebar-left">
+            <div class="sidebar-header">
+                <h2>Configuration</h2>
+                <button class="sidebar-toggle" onclick="toggleSidebar('left')" aria-label="Toggle sidebar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="sidebar-content">
+                <!-- Connection Status -->
+                <div class="config-section">
+                    <div class="connection-status" id="connection-status">
+                        <span class="status-dot disconnected"></span>
+                        <span class="status-text">Disconnected</span>
+                    </div>
+                </div>
+
+                <!-- Model Selection -->
+                <div class="config-section">
+                    <h3>Model Selection</h3>
+                    <div class="config-group">
+                        <label for="default-model">Primary Model</label>
+                        <select id="default-model" class="config-select">
+                            <option value="google/gemini-3-flash-preview" selected>Gemini 3 Flash</option>
+                            <option value="google/gemini-3-pro-preview">Gemini 3 Pro</option>
+                            <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
+                            <option value="openai/gpt-4o">GPT-4o</option>
+                            <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <label for="reasoning-model">Reasoning Model</label>
+                        <select id="reasoning-model" class="config-select">
+                            <option value="deepseek/deepseek-r1" selected>DeepSeek R1</option>
+                            <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
+                            <option value="openai/o1-preview">OpenAI o1</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Thinking Mode -->
+                <div class="config-section">
+                    <h3>Thinking Mode</h3>
+                    <div class="config-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="thinking-summaries" checked>
+                            <span class="toggle-switch"></span>
+                            Show Thinking Steps
+                        </label>
+                    </div>
+                    <div class="config-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="show-agent-transitions" checked>
+                            <span class="toggle-switch"></span>
+                            Show Agent Transitions
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Agent Toggles -->
+                <div class="config-section">
+                    <h3>Active Agents</h3>
+                    <div class="agent-toggles">
+                        <label class="toggle-label agent-toggle">
+                            <input type="checkbox" data-agent="planner" checked disabled>
+                            <span class="toggle-switch"></span>
+                            <span class="agent-name">Planner</span>
+                            <span class="agent-status" id="agent-planner-status"></span>
+                        </label>
+                        <label class="toggle-label agent-toggle">
+                            <input type="checkbox" data-agent="searcher" checked>
+                            <span class="toggle-switch"></span>
+                            <span class="agent-name">Searcher</span>
+                            <span class="agent-status" id="agent-searcher-status"></span>
+                        </label>
+                        <label class="toggle-label agent-toggle">
+                            <input type="checkbox" data-agent="reader" checked>
+                            <span class="toggle-switch"></span>
+                            <span class="agent-name">Reader</span>
+                            <span class="agent-status" id="agent-reader-status"></span>
+                        </label>
+                        <label class="toggle-label agent-toggle">
+                            <input type="checkbox" data-agent="synthesizer" checked>
+                            <span class="toggle-switch"></span>
+                            <span class="agent-name">Synthesizer</span>
+                            <span class="agent-status" id="agent-synthesizer-status"></span>
+                        </label>
+                        <label class="toggle-label agent-toggle">
+                            <input type="checkbox" data-agent="critic" checked>
+                            <span class="toggle-switch"></span>
+                            <span class="agent-name">Critic</span>
+                            <span class="agent-status" id="agent-critic-status"></span>
+                        </label>
+                        <label class="toggle-label agent-toggle">
+                            <input type="checkbox" data-agent="reporter" checked disabled>
+                            <span class="toggle-switch"></span>
+                            <span class="agent-name">Reporter</span>
+                            <span class="agent-status" id="agent-reporter-status"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Theme Toggle -->
+                <div class="config-section">
+                    <h3>Appearance</h3>
+                    <div class="config-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="dark-mode" checked>
+                            <span class="toggle-switch"></span>
+                            Dark Mode
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content: Chat Interface -->
+        <main class="main-content">
+            <header class="app-header">
+                <button class="mobile-menu-btn" onclick="toggleSidebar('left')" aria-label="Open left menu">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18M3 6h18M3 18h18"/>
+                    </svg>
+                </button>
+                <div class="logo">
+                    <span class="logo-icon">🔬</span>
+                    <span class="logo-text">DRX</span>
+                    <span class="logo-subtitle">Deep Research X</span>
+                </div>
+                <button class="mobile-menu-btn" onclick="toggleSidebar('right')" aria-label="Open right menu">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </header>
+
+            <!-- Chat Messages -->
+            <div class="chat-container" id="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Welcome Message -->
+                    <div class="message system-message">
+                        <div class="message-content">
+                            <h2>Welcome to DRX Deep Research</h2>
+                            <p>Ask any complex research question and I'll conduct comprehensive multi-agent research to provide you with a detailed, cited report.</p>
+                            <div class="example-queries">
+                                <p><strong>Try asking:</strong></p>
+                                <button class="example-btn" onclick="setQuery(this.textContent)">What are the latest advancements in quantum computing?</button>
+                                <button class="example-btn" onclick="setQuery(this.textContent)">Compare transformer and state-space models for sequence modeling</button>
+                                <button class="example-btn" onclick="setQuery(this.textContent)">How does CRISPR gene editing work and what are its applications?</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress Indicator -->
+                <div class="progress-container" id="progress-container" style="display: none;">
+                    <div class="progress-header">
+                        <span class="progress-phase" id="progress-phase">Initializing...</span>
+                        <span class="progress-iteration" id="progress-iteration"></span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    <div class="progress-details">
+                        <span class="progress-tokens" id="progress-tokens">Tokens: 0 / 500,000</span>
+                        <span class="progress-time" id="progress-time">00:00</span>
+                    </div>
+                    <div class="agent-activity" id="agent-activity"></div>
+
+                    <!-- DAG Visualization -->
+                    <div class="dag-section" id="dag-section" style="display: none;">
+                        <div class="dag-section-header">
+                            <h3>Research Workflow</h3>
+                            <div class="dag-controls">
+                                <button class="dag-control-btn" onclick="DRXDAG.fitToContainer()" title="Fit to view">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                    </svg>
+                                    <span>Fit</span>
+                                </button>
+                                <button class="dag-control-btn" onclick="DRXDAG.resetView()" title="Reset zoom">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 4v6h6M23 20v-6h-6"/>
+                                        <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                                    </svg>
+                                    <span>Reset</span>
+                                </button>
+                                <button class="dag-control-btn" onclick="DRXDAG.exportPNG()" title="Export as PNG">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                        <polyline points="7 10 12 15 17 10"/>
+                                        <line x1="12" y1="15" x2="12" y2="3"/>
+                                    </svg>
+                                    <span>Export</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="dag-container" class="dag-container">
+                            <!-- DAG visualization will be rendered here -->
+                        </div>
+                        <div class="dag-legend">
+                            <div class="dag-legend-item">
+                                <span class="dag-legend-dot pending"></span>
+                                <span>Pending</span>
+                            </div>
+                            <div class="dag-legend-item">
+                                <span class="dag-legend-dot running"></span>
+                                <span>Running</span>
+                            </div>
+                            <div class="dag-legend-item">
+                                <span class="dag-legend-dot completed"></span>
+                                <span>Completed</span>
+                            </div>
+                            <div class="dag-legend-item">
+                                <span class="dag-legend-dot failed"></span>
+                                <span>Failed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea
+                        id="query-input"
+                        class="query-input"
+                        placeholder="Ask a research question... (min 10 characters)"
+                        rows="1"
+                        maxlength="10000"
+                    ></textarea>
+                    <div class="input-actions">
+                        <span class="char-count" id="char-count">0 / 10000</span>
+                        <button class="send-btn" id="send-btn" onclick="sendQuery()" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="input-hint">
+                    Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Research Parameters -->
+        <aside class="sidebar sidebar-right" id="sidebar-right">
+            <div class="sidebar-header">
+                <button class="sidebar-toggle" onclick="toggleSidebar('right')" aria-label="Toggle sidebar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                </button>
+                <h2>Research Settings</h2>
+            </div>
+
+            <div class="sidebar-content">
+                <!-- Steerability -->
+                <div class="config-section">
+                    <h3>Output Style</h3>
+                    <div class="config-group">
+                        <label for="tone">Tone</label>
+                        <select id="tone" class="config-select">
+                            <option value="technical" selected>Technical</option>
+                            <option value="executive">Executive Summary</option>
+                            <option value="casual">Casual</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <label for="format">Format</label>
+                        <select id="format" class="config-select">
+                            <option value="markdown" selected>Markdown</option>
+                            <option value="markdown_table">Markdown with Tables</option>
+                            <option value="json">JSON</option>
+                        </select>
+                    </div>
+                    <div class="config-group">
+                        <label for="language">Language</label>
+                        <select id="language" class="config-select">
+                            <option value="en" selected>English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ja">Japanese</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Research Parameters -->
+                <div class="config-section">
+                    <h3>Research Depth</h3>
+                    <div class="config-group">
+                        <label for="max-iterations">
+                            Max Iterations: <span id="max-iterations-value">5</span>
+                        </label>
+                        <input type="range" id="max-iterations" min="1" max="10" value="5" class="config-slider">
+                    </div>
+                    <div class="config-group">
+                        <label for="max-sources">
+                            Max Sources: <span id="max-sources-value">20</span>
+                        </label>
+                        <input type="range" id="max-sources" min="5" max="50" value="20" class="config-slider">
+                    </div>
+                    <div class="config-group">
+                        <label for="token-budget">
+                            Token Budget: <span id="token-budget-value">500K</span>
+                        </label>
+                        <input type="range" id="token-budget" min="50000" max="1000000" step="50000" value="500000" class="config-slider">
+                    </div>
+                    <div class="config-group">
+                        <label for="timeout">
+                            Timeout: <span id="timeout-value">10 min</span>
+                        </label>
+                        <input type="range" id="timeout" min="60" max="1800" step="60" value="600" class="config-slider">
+                    </div>
+                </div>
+
+                <!-- Quality Options -->
+                <div class="config-section">
+                    <h3>Quality Settings</h3>
+                    <div class="config-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="enable-citations" checked>
+                            <span class="toggle-switch"></span>
+                            Enable Citations
+                        </label>
+                    </div>
+                    <div class="config-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="enable-quality-checks" checked>
+                            <span class="toggle-switch"></span>
+                            Quality Checks
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Focus Areas -->
+                <div class="config-section">
+                    <h3>Focus Areas</h3>
+                    <div class="config-group">
+                        <div class="tag-input-container">
+                            <div class="tags" id="focus-tags"></div>
+                            <input type="text" id="focus-input" class="tag-input" placeholder="Add focus area...">
+                        </div>
+                        <small>Press Enter to add (max 10)</small>
+                    </div>
+                </div>
+
+                <!-- Exclude Topics -->
+                <div class="config-section">
+                    <h3>Exclude Topics</h3>
+                    <div class="config-group">
+                        <div class="tag-input-container">
+                            <div class="tags" id="exclude-tags"></div>
+                            <input type="text" id="exclude-input" class="tag-input" placeholder="Add topic to exclude...">
+                        </div>
+                        <small>Press Enter to add (max 10)</small>
+                    </div>
+                </div>
+
+                <!-- Preferred Domains -->
+                <div class="config-section">
+                    <h3>Preferred Domains</h3>
+                    <div class="config-group">
+                        <div class="tag-input-container">
+                            <div class="tags" id="domain-tags"></div>
+                            <input type="text" id="domain-input" class="tag-input" placeholder="e.g., arxiv.org, *.edu">
+                        </div>
+                        <small>Press Enter to add (max 20)</small>
+                    </div>
+                </div>
+
+                <!-- Custom Instructions -->
+                <div class="config-section">
+                    <h3>Custom Instructions</h3>
+                    <div class="config-group">
+                        <textarea
+                            id="custom-instructions"
+                            class="config-textarea"
+                            placeholder="Additional guidance for the research..."
+                            maxlength="2000"
+                            rows="3"
+                        ></textarea>
+                        <small><span id="instructions-count">0</span> / 2000</small>
+                    </div>
+                </div>
+
+                <!-- History -->
+                <div class="config-section">
+                    <h3>Recent Research</h3>
+                    <div class="history-list" id="history-list">
+                        <p class="history-empty">No recent research</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Report Modal -->
+    <div class="modal" id="report-modal">
+        <div class="modal-backdrop" onclick="closeModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Research Report</h2>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="copyReport()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                        </svg>
+                        Copy
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadReport()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        Download
+                    </button>
+                    <button class="btn btn-icon" onclick="closeModal()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body" id="report-content">
+                <!-- Report will be rendered here -->
+            </div>
+
+            <!-- Knowledge Graph Section -->
+            <div class="graph-section" id="graph-section" style="display: none;">
+                <h3>Knowledge Graph</h3>
+                <div id="graph-container" class="graph-container">
+                    <!-- Graph controls -->
+                    <div class="graph-controls">
+                        <button class="graph-filter-btn active" data-type="" onclick="handleGraphFilter(this)">All</button>
+                        <button class="graph-filter-btn" data-type="person" onclick="handleGraphFilter(this)">People</button>
+                        <button class="graph-filter-btn" data-type="organization" onclick="handleGraphFilter(this)">Organizations</button>
+                        <button class="graph-filter-btn" data-type="concept" onclick="handleGraphFilter(this)">Concepts</button>
+                        <button class="graph-filter-btn" data-type="claim" onclick="handleGraphFilter(this)">Claims</button>
+                        <button class="graph-filter-btn export-btn" onclick="DRXGraph.exportPNG()">Export PNG</button>
+                    </div>
+                    <!-- Detail panel for node/edge info -->
+                    <div id="graph-detail-panel"></div>
+                    <!-- Legend -->
+                    <div class="graph-legend">
+                        <div class="legend-item"><span class="legend-dot person"></span><span>Person</span></div>
+                        <div class="legend-item"><span class="legend-dot organization"></span><span>Organization</span></div>
+                        <div class="legend-item"><span class="legend-dot concept"></span><span>Concept</span></div>
+                        <div class="legend-item"><span class="legend-dot event"></span><span>Event</span></div>
+                        <div class="legend-item"><span class="legend-dot claim diamond"></span><span>Claim</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="report-meta" id="report-meta"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts (order matters: dependencies first) -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js" integrity="sha512-PNCiIK7ebfKGgKsrlj6+dDf1ilHoZmJl3qhV0wd6pvjkg9/BKzh/y5BO2XHSOfcmqUdbXbL8nXvbGqfOfOtcqQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="js/markdown.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/sse.js"></script>
+    <script src="js/dag.js"></script>
+    <script src="js/graph.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
