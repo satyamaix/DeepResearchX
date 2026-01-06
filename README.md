@@ -42,7 +42,8 @@ flowchart LR
 ```bash
 # 1. Clone and configure
 git clone https://github.com/your-org/drx.git && cd drx/v1
-echo "OPENROUTER_API_KEY=sk-or-v1-your-key" > deployment/.env
+cp .env.example deployment/.env
+# Edit deployment/.env and set OPENROUTER_API_KEY=sk-or-v1-your-key
 
 # 2. Launch (pulls images, initializes DB, starts 5 services)
 cd deployment && docker compose up -d
@@ -51,6 +52,8 @@ cd deployment && docker compose up -d
 curl -s http://localhost:8000/api/v1/health | jq .status
 # → "healthy"
 ```
+
+See [`.env.example`](.env.example) for all configuration options.
 
 **Access Points**:
 | Service | URL | Purpose |
@@ -119,6 +122,8 @@ flowchart LR
 | **State** | PostgreSQL + pgvector | Checkpoints, sessions, vector embeddings |
 | **Queue** | Redis + Celery | Async job execution with progress streaming |
 | **Observability** | Phoenix + OpenTelemetry | Full LLM tracing with token/latency analysis |
+
+**Deep Dive**: [Architecture Guide](docs/ARCHITECTURE.md) · [Low-Level Design](docs/LLD.md)
 
 ---
 
@@ -519,10 +524,21 @@ gantt
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md) — System design, data flow, component diagrams
-- [Low-Level Design](docs/LLD.md) — Class diagrams, API specs, database schema
-- [Evaluation Report](ci/evaluation/EVALUATION_REPORT.md) — Latest evaluation results
-- [Gap Analysis](GAP_ANALYSIS_REPORT.md) — DRX.md coverage analysis
+### Design Documents
+
+| Document | Description |
+|----------|-------------|
+| [Architecture Guide](docs/ARCHITECTURE.md) | System design, data flow, component diagrams, observability stack |
+| [Low-Level Design](docs/LLD.md) | Class diagrams, API specs, database schema, evaluation framework classes |
+
+### References
+
+| Document | Description |
+|----------|-------------|
+| [`.env.example`](.env.example) | All configuration options with defaults |
+| [Evaluation Report](ci/evaluation/EVALUATION_REPORT.md) | Latest evaluation results and metrics |
+| [Gap Analysis](GAP_ANALYSIS_REPORT.md) | DRX.md specification coverage analysis |
+| [DRX Specification](../DRX.md) | Original architectural specification |
 
 ---
 
