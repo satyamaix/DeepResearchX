@@ -96,6 +96,20 @@ from src.orchestrator.workflow import (
     stream_research,
 )
 
+from src.orchestrator.budget import (
+    # Core classes
+    BudgetTracker,
+    BudgetExceededError,
+    # Type definitions
+    BudgetStatus,
+    UsageRecord,
+    # Cost configuration
+    MODEL_COSTS,
+    get_model_cost,
+    # Factory function
+    create_budget_tracker,
+)
+
 
 __all__ = [
     # State types
@@ -160,4 +174,12 @@ __all__ = [
     # Convenience functions
     "run_research",
     "stream_research",
+    # Budget tracking
+    "BudgetTracker",
+    "BudgetExceededError",
+    "BudgetStatus",
+    "UsageRecord",
+    "MODEL_COSTS",
+    "get_model_cost",
+    "create_budget_tracker",
 ]
