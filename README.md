@@ -662,17 +662,174 @@ pytest ci/evaluation/ -v
 
 ---
 
+## Observability
+
+DRX provides comprehensive observability through Arize Phoenix for LLM tracing and Prometheus/Grafana for metrics.
+
+### Arize Phoenix Tracing
+
+```mermaid
+flowchart TB
+    subgraph Application["DRX Application"]
+        subgraph Spans["Trace Spans"]
+            Root["research_session<br/>(root span)"]
+            Planner["planner_agent"]
+            Searcher["searcher_agent"]
+            Reader["reader_agent"]
+            Synthesizer["synthesizer_agent"]
+            Critic["critic_agent"]
+            Reporter["reporter_agent"]
+        end
+
+        subgraph LLMSpans["LLM Call Spans"]
+            LLM1["llm_call (prompt, completion)"]
+            LLM2["token counts, latency"]
+            LLM3["model, temperature"]
+        end
+    end
+
+    subgraph Phoenix["Phoenix Collector :6006"]
+        OTLP["OTLP Receiver :4317"]
+        Storage["Trace Storage"]
+        UI["Web UI Dashboard"]
+        Analysis["Token Analysis"]
+    end
+
+    Root --> Planner & Searcher & Reader & Synthesizer & Critic & Reporter
+    Planner & Searcher --> LLMSpans
+    LLMSpans -->|"OTLP/gRPC"| OTLP
+    OTLP --> Storage --> UI & Analysis
+```
+
+### Key Observability Features
+
+| Feature | Tool | Purpose |
+|---------|------|---------|
+| **LLM Tracing** | Phoenix | Track prompts, completions, tokens per agent |
+| **Latency Analysis** | Phoenix | Identify slow agents and LLM calls |
+| **Cost Tracking** | Phoenix + Custom | Real-time token/cost per session |
+| **Error Tracing** | Phoenix | Distributed trace debugging |
+| **Metrics** | Prometheus | Time-series performance metrics |
+| **Dashboards** | Grafana | Visual monitoring & alerting |
+
+### Accessing Observability Tools
+
+```bash
+# Phoenix UI - LLM Traces
+open http://localhost:6006
+
+# Grafana Dashboards
+open http://localhost:3000
+
+# Prometheus Metrics
+curl http://localhost:8000/metrics
+```
+
+---
+
 ## Evaluation
 
-DRX includes comprehensive evaluation with DeepEval and Ragas:
+DRX includes a comprehensive evaluation pipeline using industry-standard frameworks:
 
-| Metric | Target | Description |
-|--------|--------|-------------|
-| **Faithfulness** | >= 0.8 | Claims supported by sources |
-| **Task Completion** | >= 0.7 | Query fully addressed |
-| **Hallucination Rate** | <= 0.2 | Unsupported claims |
-| **Policy Violations** | == 0 | Domain/budget violations |
-| **Coverage Score** | >= 0.7 | Research completeness |
+### Evaluation Frameworks
+
+```mermaid
+flowchart TB
+    subgraph Evaluation["Evaluation Pipeline"]
+        Runner["Evaluation Runner<br/>ci/evaluation/run_evaluation.py"]
+        Cases["Test Cases<br/>curated_test_cases.yaml"]
+    end
+
+    subgraph Frameworks["Evaluation Frameworks"]
+        subgraph DeepEval["DeepEval v3.7+"]
+            Faith["FaithfulnessMetric"]
+            Halluc["HallucinationMetric"]
+            Relevancy["AnswerRelevancyMetric"]
+        end
+
+        subgraph Ragas["Ragas v0.4+"]
+            CtxPrec["context_precision"]
+            CtxRecall["context_recall"]
+        end
+
+        subgraph Custom["Custom Metrics"]
+            TaskComp["task_completion"]
+            Policy["policy_compliance"]
+        end
+    end
+
+    subgraph Output["Outputs"]
+        Results["eval_results.json"]
+        Metrics["metrics_results.json"]
+        Report["EVALUATION_REPORT.md"]
+    end
+
+    Cases --> Runner
+    Runner --> Frameworks
+    Frameworks --> Output
+```
+
+### Evaluation Metrics
+
+#### Hard Gates (Must Pass)
+
+| Metric | Framework | Target | Description |
+|--------|-----------|--------|-------------|
+| **task_completion** | Custom | >= 0.7 | Percentage of queries producing output |
+| **faithfulness** | DeepEval | >= 0.8 | Claims supported by retrieved sources |
+| **hallucination** | DeepEval | <= 0.2 | Rate of unsupported claims |
+| **policy_violations** | Custom | 100% blocked | Harmful/PII requests must be blocked |
+
+#### Soft Gates (Warnings)
+
+| Metric | Framework | Target | Description |
+|--------|-----------|--------|-------------|
+| **answer_relevancy** | DeepEval | >= 0.7 | Output relevance to query |
+| **context_precision** | Ragas | >= 0.6 | Relevance of retrieved context |
+| **context_recall** | Ragas | >= 0.6 | Coverage of required information |
+
+### Running Evaluations
+
+```bash
+# Smoke test (2 scenarios)
+python ci/evaluation/run_evaluation.py \
+  --scenarios ci/evaluation/curated_test_cases.yaml \
+  --group smoke_test \
+  --output ci/evaluation/smoke_test_results.json \
+  --verbose
+
+# Full evaluation (10 scenarios)
+python ci/evaluation/run_evaluation.py \
+  --scenarios ci/evaluation/curated_test_cases.yaml \
+  --group full_evaluation \
+  --output ci/evaluation/eval_results.json \
+  --verbose
+
+# Compute DeepEval/Ragas metrics
+python ci/evaluation/compute_metrics.py \
+  --input ci/evaluation/eval_results.json \
+  --output ci/evaluation/metrics_results.json
+
+# Generate report
+python ci/evaluation/generate_report.py \
+  --metrics ci/evaluation/metrics_results.json \
+  --output ci/evaluation/EVALUATION_REPORT.md
+```
+
+### Test Case Categories
+
+| Category | Count | Description |
+|----------|-------|-------------|
+| **Competitor Analysis** | 1 | Market research queries |
+| **Technical Research** | 1 | Technical/scientific queries |
+| **Market Sizing** | 1 | Business intelligence queries |
+| **Regulatory Research** | 1 | Compliance-focused queries |
+| **Product Comparison** | 1 | Comparative analysis |
+| **Executive Summary** | 1 | Synthesis queries |
+| **Quick Fact Check** | 1 | Fact verification |
+| **News Synthesis** | 1 | Current events analysis |
+| **Policy Violation (PII)** | 1 | Should be blocked |
+| **Policy Violation (Harmful)** | 1 | Should be blocked |
 
 ### Dataset Flywheel
 
@@ -688,6 +845,18 @@ flowchart LR
     FineTune --> Improve["Improved Models"]
     Improve --> Research
 ```
+
+### Evaluation Files
+
+| File | Purpose |
+|------|---------|
+| `ci/evaluation/curated_test_cases.yaml` | 10 curated test scenarios |
+| `ci/evaluation/run_evaluation.py` | Main evaluation runner |
+| `ci/evaluation/compute_metrics.py` | DeepEval/Ragas metric computation |
+| `ci/evaluation/generate_report.py` | Markdown report generator |
+| `ci/evaluation/eval_results.json` | Raw evaluation outputs |
+| `ci/evaluation/metrics_results.json` | Computed metrics |
+| `ci/evaluation/EVALUATION_REPORT.md` | Human-readable report |
 
 ---
 

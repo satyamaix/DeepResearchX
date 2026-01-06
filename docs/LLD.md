@@ -11,6 +11,11 @@
 7. [API Specifications](#api-specifications)
 8. [Error Handling](#error-handling)
 9. [Configuration Schema](#configuration-schema)
+10. [Evaluation Framework Classes](#evaluation-framework-classes)
+    - [DeepEval Integration](#deepeval-integration-classes)
+    - [Ragas Integration](#ragas-integration-classes)
+    - [Custom Metrics](#custom-metric-classes)
+    - [Phoenix Observability](#phoenix-observability-classes)
 
 ---
 
@@ -1487,4 +1492,522 @@ flowchart TB
         AgentMetrics["drx:agent:{id}:metrics<br/>HASH: tokens, latency"]
         CircuitState["drx:agent:{id}:circuit<br/>HASH: state, failures"]
     end
+```
+
+---
+
+## Evaluation Framework Classes
+
+### Evaluation Pipeline Classes
+
+```mermaid
+classDiagram
+    class EvaluationRunner {
+        -api_base_url: str
+        -timeout: int
+        -scenarios: list~TestScenario~
+        +load_scenarios(path: Path, group: str) list~TestScenario~
+        +run_scenario(scenario: TestScenario) EvaluationResult
+        +run_all() list~EvaluationResult~
+        +save_results(results: list, output: Path) None
+        -_call_api(query: str) APIResponse
+        -_wait_for_completion(interaction_id: str) FinalResult
+    }
+
+    class TestScenario {
+        <<TypedDict>>
+        +id: str
+        +name: str
+        +input: str
+        +expected_output_contains: list~str~ | None
+        +expect_blocked: bool
+        +category: str
+        +group: list~str~
+        +timeout_seconds: int
+    }
+
+    class EvaluationResult {
+        <<TypedDict>>
+        +scenario_id: str
+        +input: str
+        +actual_output: str
+        +retrieval_context: list~str~
+        +citations: list~dict~
+        +duration_seconds: float
+        +success: bool
+        +error: str | None
+        +policy_blocked: bool
+    }
+
+    class APIResponse {
+        <<TypedDict>>
+        +interaction_id: str
+        +status: str
+        +result: dict | None
+    }
+
+    EvaluationRunner --> TestScenario
+    EvaluationRunner --> EvaluationResult
+    EvaluationRunner --> APIResponse
+```
+
+### DeepEval Integration Classes
+
+```mermaid
+classDiagram
+    class DeepEvalMetricRunner {
+        -model: str
+        -metrics: list~BaseMetric~
+        +compute_faithfulness(results: list~EvaluationResult~) FaithfulnessResult
+        +compute_hallucination(results: list~EvaluationResult~) HallucinationResult
+        +compute_answer_relevancy(results: list~EvaluationResult~) RelevancyResult
+        +run_all_metrics(results: list) DeepEvalMetrics
+        -_create_test_case(result: EvaluationResult) LLMTestCase
+    }
+
+    class LLMTestCase {
+        <<DeepEval>>
+        +input: str
+        +actual_output: str
+        +retrieval_context: list~str~
+        +expected_output: str | None
+        +context: list~str~ | None
+    }
+
+    class FaithfulnessMetric {
+        <<DeepEval>>
+        +threshold: float
+        +model: str
+        +measure(test_case: LLMTestCase) float
+        +is_successful() bool
+        +score: float
+        +reason: str
+    }
+
+    class HallucinationMetric {
+        <<DeepEval>>
+        +threshold: float
+        +model: str
+        +measure(test_case: LLMTestCase) float
+        +is_successful() bool
+        +score: float
+        +reason: str
+    }
+
+    class AnswerRelevancyMetric {
+        <<DeepEval>>
+        +threshold: float
+        +model: str
+        +measure(test_case: LLMTestCase) float
+        +is_successful() bool
+        +score: float
+        +reason: str
+    }
+
+    class DeepEvalMetrics {
+        <<TypedDict>>
+        +computed: bool
+        +reason: str | None
+        +faithfulness_avg: float | None
+        +hallucination_avg: float | None
+        +answer_relevancy_avg: float | None
+        +per_scenario: dict~str, ScenarioMetrics~
+    }
+
+    class ScenarioMetrics {
+        <<TypedDict>>
+        +faithfulness: float | None
+        +hallucination: float | None
+        +answer_relevancy: float | None
+        +passed: bool
+    }
+
+    DeepEvalMetricRunner --> LLMTestCase
+    DeepEvalMetricRunner --> FaithfulnessMetric
+    DeepEvalMetricRunner --> HallucinationMetric
+    DeepEvalMetricRunner --> AnswerRelevancyMetric
+    DeepEvalMetricRunner --> DeepEvalMetrics
+    DeepEvalMetrics --> ScenarioMetrics
+```
+
+### Ragas Integration Classes
+
+```mermaid
+classDiagram
+    class RagasMetricRunner {
+        -llm: LLM
+        -embeddings: Embeddings
+        +compute_context_precision(results: list~EvaluationResult~) float
+        +compute_context_recall(results: list~EvaluationResult~) float
+        +run_all_metrics(results: list) RagasMetrics
+        -_prepare_dataset(results: list) Dataset
+    }
+
+    class RagasDataset {
+        <<Ragas>>
+        +question: list~str~
+        +answer: list~str~
+        +contexts: list~list~str~~
+        +ground_truth: list~str~ | None
+    }
+
+    class ContextPrecision {
+        <<Ragas>>
+        +name: str
+        +score(dataset: Dataset) float
+    }
+
+    class ContextRecall {
+        <<Ragas>>
+        +name: str
+        +score(dataset: Dataset) float
+    }
+
+    class RagasMetrics {
+        <<TypedDict>>
+        +computed: bool
+        +reason: str | None
+        +context_precision: float | None
+        +context_recall: float | None
+    }
+
+    RagasMetricRunner --> RagasDataset
+    RagasMetricRunner --> ContextPrecision
+    RagasMetricRunner --> ContextRecall
+    RagasMetricRunner --> RagasMetrics
+```
+
+### Custom Metric Classes
+
+```mermaid
+classDiagram
+    class TaskCompletionMetric {
+        +threshold: float
+        +compute(results: list~EvaluationResult~) TaskCompletionResult
+        -_has_output(result: EvaluationResult) bool
+    }
+
+    class TaskCompletionResult {
+        <<TypedDict>>
+        +computed: bool
+        +total_scenarios: int
+        +with_output: int
+        +without_output: int
+        +task_completion_rate: float
+        +passed: bool
+    }
+
+    class PolicyComplianceMetric {
+        +compute(results: list~EvaluationResult~) PolicyComplianceResult
+        -_is_policy_scenario(result: EvaluationResult) bool
+        -_was_blocked(result: EvaluationResult) bool
+    }
+
+    class PolicyComplianceResult {
+        <<TypedDict>>
+        +computed: bool
+        +negative_tests: int
+        +blocked: int
+        +not_blocked: int
+        +policy_enforcement_rate: float
+        +passed: bool
+    }
+
+    TaskCompletionMetric --> TaskCompletionResult
+    PolicyComplianceMetric --> PolicyComplianceResult
+```
+
+### Metrics Aggregation Classes
+
+```mermaid
+classDiagram
+    class MetricsAggregator {
+        -deepeval_runner: DeepEvalMetricRunner
+        -ragas_runner: RagasMetricRunner
+        -task_metric: TaskCompletionMetric
+        -policy_metric: PolicyComplianceMetric
+        +compute_all(results: list~EvaluationResult~) AggregatedMetrics
+        +evaluate_gates(metrics: AggregatedMetrics) GateResults
+    }
+
+    class AggregatedMetrics {
+        <<TypedDict>>
+        +timestamp: str
+        +deepeval: DeepEvalMetrics
+        +ragas: RagasMetrics
+        +task_completion: TaskCompletionResult
+        +policy_compliance: PolicyComplianceResult
+    }
+
+    class GateResults {
+        <<TypedDict>>
+        +hard_gates: list~GateResult~
+        +soft_gates: list~GateResult~
+        +overall_passed: bool
+    }
+
+    class GateResult {
+        <<TypedDict>>
+        +metric: str
+        +score: float | None
+        +threshold: float
+        +comparison: str
+        +passed: bool
+        +status: str
+    }
+
+    MetricsAggregator --> AggregatedMetrics
+    MetricsAggregator --> GateResults
+    GateResults --> GateResult
+```
+
+### Report Generator Classes
+
+```mermaid
+classDiagram
+    class EvaluationReportGenerator {
+        -template_path: Path
+        -output_path: Path
+        +generate(metrics: AggregatedMetrics, results: list~EvaluationResult~) str
+        +save(content: str) Path
+        -_render_executive_summary(metrics: AggregatedMetrics) str
+        -_render_gate_tables(metrics: AggregatedMetrics) str
+        -_render_scenario_results(results: list) str
+        -_render_recommendations(metrics: AggregatedMetrics) str
+    }
+
+    class ReportSection {
+        <<TypedDict>>
+        +title: str
+        +content: str
+        +tables: list~MarkdownTable~
+    }
+
+    class MarkdownTable {
+        <<TypedDict>>
+        +headers: list~str~
+        +rows: list~list~str~~
+        +alignment: list~str~
+    }
+
+    EvaluationReportGenerator --> ReportSection
+    ReportSection --> MarkdownTable
+```
+
+### Evaluation Configuration Schema
+
+```mermaid
+classDiagram
+    class EvaluationConfig {
+        <<TypedDict>>
+        +api_base_url: str
+        +timeout_seconds: int
+        +parallel_workers: int
+        +deepeval_model: str
+        +ragas_llm: str
+        +gates: GateConfig
+    }
+
+    class GateConfig {
+        <<TypedDict>>
+        +hard_gates: list~GateDefinition~
+        +soft_gates: list~GateDefinition~
+    }
+
+    class GateDefinition {
+        <<TypedDict>>
+        +metric: str
+        +threshold: float
+        +comparison: Literal~gte, lte, eq~
+        +framework: Literal~deepeval, ragas, custom~
+    }
+
+    EvaluationConfig --> GateConfig
+    GateConfig --> GateDefinition
+```
+
+### Phoenix Observability Classes
+
+```mermaid
+classDiagram
+    class PhoenixSetup {
+        -endpoint: str
+        -enabled: bool
+        -tracer_provider: TracerProvider
+        +setup() TracerProvider
+        +get_tracer(name: str) Tracer
+        +shutdown() None
+    }
+
+    class TracerProvider {
+        <<OpenTelemetry>>
+        +add_span_processor(processor: SpanProcessor)
+        +get_tracer(name: str) Tracer
+        +shutdown()
+    }
+
+    class BatchSpanProcessor {
+        <<OpenTelemetry>>
+        +on_start(span: Span)
+        +on_end(span: Span)
+        +shutdown()
+        +force_flush()
+    }
+
+    class OTLPSpanExporter {
+        <<OpenTelemetry>>
+        -endpoint: str
+        +export(spans: list~Span~) ExportResult
+        +shutdown()
+    }
+
+    class Tracer {
+        <<OpenTelemetry>>
+        +start_span(name: str, attributes: dict) Span
+        +start_as_current_span(name: str) ContextManager~Span~
+    }
+
+    class Span {
+        <<OpenTelemetry>>
+        +set_attribute(key: str, value: Any)
+        +set_status(status: StatusCode)
+        +record_exception(exception: Exception)
+        +end()
+        +add_event(name: str, attributes: dict)
+    }
+
+    class SpanAttributes {
+        <<Custom>>
+        +SESSION_ID: str
+        +AGENT_TYPE: str
+        +MODEL: str
+        +INPUT_TOKENS: int
+        +OUTPUT_TOKENS: int
+        +LATENCY_MS: float
+        +QUERY: str
+        +ERROR: str
+    }
+
+    PhoenixSetup --> TracerProvider
+    TracerProvider --> BatchSpanProcessor
+    BatchSpanProcessor --> OTLPSpanExporter
+    TracerProvider --> Tracer
+    Tracer --> Span
+    Span --> SpanAttributes
+```
+
+### Trace Context Propagation
+
+```mermaid
+classDiagram
+    class TraceContextManager {
+        -tracer: Tracer
+        -current_span: Span | None
+        +start_session_trace(session_id: str, query: str) Span
+        +start_agent_trace(agent_type: str) Span
+        +start_llm_trace(model: str, input_tokens: int) Span
+        +start_tool_trace(tool_name: str) Span
+        +end_span(span: Span, status: StatusCode)
+        +record_tokens(input_tokens: int, output_tokens: int)
+        +record_error(error: Exception)
+    }
+
+    class SessionTraceContext {
+        <<TypedDict>>
+        +trace_id: str
+        +span_id: str
+        +session_id: str
+        +start_time: float
+        +agents_executed: list~str~
+        +total_tokens: int
+        +total_latency_ms: float
+    }
+
+    class AgentTraceContext {
+        <<TypedDict>>
+        +agent_type: str
+        +parent_span_id: str
+        +input_state_hash: str
+        +output_state_hash: str
+        +tokens_used: int
+        +latency_ms: float
+    }
+
+    TraceContextManager --> SessionTraceContext
+    TraceContextManager --> AgentTraceContext
+```
+
+### Evaluation Result Schema (JSON)
+
+```json
+{
+  "results": [
+    {
+      "scenario_id": "competitor_analysis",
+      "input": "Who are the top 3 competitors to Stripe?",
+      "actual_output": "The top 3 competitors...",
+      "retrieval_context": ["source1 content", "source2 content"],
+      "citations": [
+        {"url": "https://...", "title": "..."}
+      ],
+      "duration_seconds": 45.2,
+      "success": true,
+      "error": null,
+      "policy_blocked": false
+    }
+  ],
+  "metadata": {
+    "timestamp": "2026-01-06T04:48:22.707486+00:00",
+    "total_scenarios": 10,
+    "successful": 8,
+    "failed": 0,
+    "policy_blocked": 2,
+    "total_duration_seconds": 350.5
+  }
+}
+```
+
+### Metrics Result Schema (JSON)
+
+```json
+{
+  "timestamp": "2026-01-06T05:00:00.000000+00:00",
+  "deepeval": {
+    "computed": true,
+    "reason": null,
+    "faithfulness_avg": 0.85,
+    "hallucination_avg": 0.12,
+    "answer_relevancy_avg": 0.78,
+    "per_scenario": {
+      "competitor_analysis": {
+        "faithfulness": 0.90,
+        "hallucination": 0.08,
+        "answer_relevancy": 0.82,
+        "passed": true
+      }
+    }
+  },
+  "ragas": {
+    "computed": true,
+    "reason": null,
+    "context_precision": 0.72,
+    "context_recall": 0.65
+  },
+  "task_completion": {
+    "computed": true,
+    "total_scenarios": 10,
+    "with_output": 8,
+    "without_output": 2,
+    "task_completion_rate": 0.80,
+    "passed": true
+  },
+  "policy_compliance": {
+    "computed": true,
+    "negative_tests": 2,
+    "blocked": 2,
+    "not_blocked": 0,
+    "policy_enforcement_rate": 1.0,
+    "passed": true
+  }
+}
 ```
