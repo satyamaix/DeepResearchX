@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING, TypedDict
 import httpx
 from rapidfuzz import fuzz
 
+from src.utils.url_validator import SSRFError, validate_url
+
 if TYPE_CHECKING:
     from ..orchestrator.state import CitationRecord
 
@@ -113,6 +115,20 @@ class CitationVerifier:
             URLStatus with accessibility information
         """
         start = time.perf_counter()
+
+        # Validate URL to prevent SSRF attacks
+        try:
+            validate_url(url)
+        except SSRFError as e:
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            return URLStatus(
+                url=url,
+                accessible=False,
+                status_code=None,
+                error=f"SSRF blocked: {e}",
+                response_time_ms=round(elapsed_ms, 2),
+                checked_at=datetime.utcnow().isoformat() + "Z",
+            )
 
         try:
             async with self._semaphore:
@@ -333,15 +349,20 @@ class CitationVerifier:
         async def verify_one(citation: CitationRecord) -> VerificationResult:
             source_content = None
             if fetch_content:
+                url = citation.get("url", "")
+                # Validate URL before fetching to prevent SSRF
                 try:
+                    validate_url(url)
                     async with httpx.AsyncClient(timeout=self._timeout) as client:
                         response = await client.get(
-                            citation.get("url", ""),
+                            url,
                             headers={"User-Agent": self._user_agent},
                             follow_redirects=True,
                         )
                         if response.status_code == 200:
                             source_content = response.text
+                except SSRFError:
+                    pass  # SSRF blocked - will be noted by verify_citation
                 except Exception:
                     pass  # Will be noted as URL not accessible
 

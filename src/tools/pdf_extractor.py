@@ -16,6 +16,8 @@ from urllib.parse import urlparse
 import httpx
 from pypdf import PdfReader
 
+from src.utils.url_validator import SSRFError, validate_url
+
 logger = logging.getLogger(__name__)
 
 
@@ -106,6 +108,12 @@ class PDFExtractor:
 
     async def _download_pdf(self, url: str) -> bytes:
         """Download PDF from URL."""
+        # Validate URL to prevent SSRF attacks
+        try:
+            validate_url(url)
+        except SSRFError as e:
+            raise ValueError(f"Invalid URL for PDF extraction: {e}")
+
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.get(
                 url,
