@@ -7,6 +7,7 @@ research interactions with proper validation and error handling.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -293,8 +294,8 @@ async def create_interaction(
     The client should then connect to the /stream endpoint
     to receive real-time progress updates.
     """
-    # Generate unique interaction ID
-    interaction_id = f"int_{uuid.uuid4().hex[:16]}"
+    # Generate unique interaction ID (UUID format for PostgreSQL compatibility)
+    interaction_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
 
     # Prepare configuration
@@ -317,7 +318,7 @@ async def create_interaction(
                 "id": interaction_id,
                 "user_id": user.id,
                 "query": request.input,
-                "status": "queued",
+                "status": "pending",
                 "config": config.model_dump_json(),
                 "steerability": steerability.model_dump_json(),
                 "created_at": now,
@@ -333,7 +334,7 @@ async def create_interaction(
     await redis.hset(
         f"interaction:{interaction_id}",
         mapping={
-            "status": "queued",
+            "status": "pending",
             "user_id": user.id,
             "query": request.input,
             "created_at": now.isoformat(),
@@ -399,26 +400,50 @@ async def _process_interaction(
             session_id=interaction_id,
             config={**config, "steerability": steerability},
         ):
-            # Publish event to Redis channel
+            # Publish event to Redis channel - handle both dict and dataclass events
             if isinstance(event, dict):
-                event_data = StreamEvent(
-                    event_type=event.get("event_type", "content.delta"),
-                    data=event.get("data", event),
-                    checkpoint_id=event.get("checkpoint_id"),
-                )
+                event_json = json.dumps(event, default=str)
+            elif hasattr(event, "to_dict"):
+                # Workflow StreamEvent dataclass
+                event_json = json.dumps(event.to_dict(), default=str)
+            elif hasattr(event, "model_dump_json"):
+                # Pydantic StreamEvent
+                event_json = event.model_dump_json()
             else:
-                event_data = event
+                # Fallback
+                event_json = json.dumps({"event_type": str(event)}, default=str)
 
             await redis.publish(
                 f"events:{interaction_id}",
-                event_data.model_dump_json(),
+                event_json,
             )
+
+        # Get final state and persist result
+        final_state = await orchestrator.get_state(interaction_id)
+        result_data = None
+        if final_state:
+            result_data = {
+                "final_report": final_state.get("final_report"),
+                "findings": final_state.get("findings", []),
+                "citations": final_state.get("citations", []),
+                "tokens_used": final_state.get("tokens_used", 0),
+                "iteration_count": final_state.get("iteration_count", 0),
+            }
+            # Store result in Redis for quick access
+            await redis.hset(
+                f"interaction:{interaction_id}",
+                "result",
+                json.dumps(result_data, default=str),
+            )
+            logger.info(f"Stored result for interaction {interaction_id}")
 
         # Update status to completed
         await redis.hset(f"interaction:{interaction_id}", "status", "completed")
 
-        # Publish completion event
+        # Publish completion event with result
         complete_event = create_complete_event(interaction_id, "completed")
+        if result_data:
+            complete_event.data["result"] = result_data
         await redis.publish(
             f"events:{interaction_id}",
             complete_event.model_dump_json(),
@@ -456,7 +481,7 @@ async def _process_interaction(
     },
 )
 async def get_interaction(
-    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^int_[a-f0-9]{16}$")],
+    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")],
     db: DatabaseDep,
     redis: RedisDep,
     user: CurrentUserDep,
@@ -477,11 +502,16 @@ async def get_interaction(
                 detail="Access denied to this interaction",
             )
 
+        # Parse result if present
+        result_json = cached.get("result")
+        result = json.loads(result_json) if result_json else None
+
         return InteractionResponse(
             id=interaction_id,
             status=cached.get("status", "unknown"),
             created_at=datetime.fromisoformat(cached["created_at"]) if "created_at" in cached else datetime.now(timezone.utc),
             query=cached.get("query"),
+            result=result,
             error=cached.get("error"),
         )
 
@@ -541,7 +571,7 @@ async def get_interaction(
     },
 )
 async def stream_interaction(
-    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^int_[a-f0-9]{16}$")],
+    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")],
     request: Request,
     redis: RedisDep,
     user: CurrentUserDep,
@@ -649,7 +679,7 @@ async def stream_interaction(
     },
 )
 async def cancel_interaction(
-    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^int_[a-f0-9]{16}$")],
+    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")],
     db: DatabaseDep,
     redis: RedisDep,
     orchestrator: OrchestratorDep,
@@ -804,7 +834,7 @@ async def list_interactions(
     description="Resume a paused or interrupted interaction from checkpoint",
 )
 async def resume_interaction(
-    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^int_[a-f0-9]{16}$")],
+    interaction_id: Annotated[str, Path(description="Interaction ID", pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")],
     checkpoint_id: Annotated[str | None, Query(description="Checkpoint ID to resume from")] = None,
     background_tasks: BackgroundTasks = None,
     db: DatabaseDep = None,
@@ -894,6 +924,242 @@ async def resume_interaction(
 
 
 # =============================================================================
+# Feedback Endpoint (WP-3A: Dataset Flywheel)
+# =============================================================================
+
+
+class FeedbackRequest(BaseModel):
+    """User feedback submission for research session quality."""
+
+    rating: int = Field(
+        ...,
+        ge=1,
+        le=5,
+        description="Rating from 1-5 (1=poor, 5=excellent)",
+    )
+    comment: str | None = Field(
+        default=None,
+        max_length=5000,
+        description="Optional detailed feedback comment",
+    )
+    labels: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Feedback labels (e.g., 'accurate', 'comprehensive', 'well-cited')",
+    )
+
+
+class FeedbackResponse(BaseModel):
+    """Feedback submission response."""
+
+    feedback_id: str = Field(..., description="Unique feedback identifier")
+    session_id: str = Field(..., description="Associated session ID")
+    status: str = Field(..., description="Submission status")
+
+
+@router.post(
+    "/sessions/{session_id}/feedback",
+    response_model=FeedbackResponse,
+    summary="Submit session feedback",
+    description="Submit user feedback for a completed research session",
+    responses={
+        200: {"description": "Feedback submitted successfully"},
+        404: {"model": ErrorResponse, "description": "Session not found"},
+        409: {"model": ErrorResponse, "description": "Session not yet completed"},
+    },
+)
+async def submit_feedback(
+    session_id: Annotated[
+        str,
+        Path(
+            description="Session ID",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ],
+    request: FeedbackRequest,
+    db: DatabaseDep,
+    redis: RedisDep,
+    user: CurrentUserDep,
+    _rate_limit: Annotated[None, Depends(rate_limit_standard)] = None,
+) -> FeedbackResponse:
+    """Submit feedback for a research session.
+
+    This endpoint enables the Dataset Flywheel by collecting user feedback
+    on research quality for continuous improvement and fine-tuning.
+
+    The feedback includes:
+    - Rating (1-5 scale)
+    - Optional text comment
+    - Optional categorical labels
+
+    Feedback is stored in Redis for fast access and optionally persisted
+    to PostgreSQL for long-term storage and training data collection.
+    """
+    # Import here to avoid circular imports
+    from ci.evaluation.feedback_store import FeedbackStore
+
+    # Verify session exists
+    cached = await redis.hgetall(f"interaction:{session_id}")
+
+    if not cached:
+        # Try database
+        try:
+            result = await db.execute(
+                """
+                SELECT id, status, user_id FROM research_sessions
+                WHERE id = %(id)s
+                """,
+                {"id": session_id},
+            )
+            row = await result.fetchone()
+
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Session {session_id} not found",
+                )
+
+            session_user_id = row["user_id"]
+            session_status = row["status"]
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to query session {session_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session {session_id} not found",
+            )
+    else:
+        session_user_id = cached.get("user_id")
+        session_status = cached.get("status")
+
+    # Verify ownership (unless admin)
+    if session_user_id != user.id and not getattr(user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this session",
+        )
+
+    # Verify session is completed (optional: could allow feedback on any status)
+    if session_status not in ("completed", "complete"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot submit feedback for session in '{session_status}' status",
+        )
+
+    # Create feedback store and submit
+    feedback_store = FeedbackStore(redis=redis, db_pool=None)
+
+    try:
+        feedback_id = await feedback_store.submit_feedback(
+            session_id=session_id,
+            rating=request.rating,
+            comment=request.comment,
+            labels=request.labels,
+            user_id=user.id,
+            metadata={
+                "submitted_via": "api",
+                "user_agent": None,  # Could extract from request headers
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Failed to submit feedback for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to submit feedback",
+        )
+
+    # Also update dataset collector if available
+    try:
+        from ci.evaluation.dataset_collector import DatasetCollector
+
+        collector = DatasetCollector()
+        collector.add_feedback(
+            session_id=session_id,
+            rating=request.rating,
+            feedback=request.comment,
+            labels=request.labels,
+        )
+    except Exception as e:
+        # Log but don't fail - dataset collection is secondary
+        logger.warning(f"Failed to update dataset collector: {e}")
+
+    logger.info(
+        f"Feedback {feedback_id} submitted for session {session_id}",
+        extra={
+            "feedback_id": feedback_id,
+            "session_id": session_id,
+            "rating": request.rating,
+            "user_id": user.id,
+        },
+    )
+
+    return FeedbackResponse(
+        feedback_id=feedback_id,
+        session_id=session_id,
+        status="submitted",
+    )
+
+
+@router.get(
+    "/sessions/{session_id}/feedback",
+    response_model=list[dict[str, Any]],
+    summary="Get session feedback",
+    description="Retrieve all feedback for a research session",
+    responses={
+        200: {"description": "Feedback retrieved successfully"},
+        404: {"model": ErrorResponse, "description": "Session not found"},
+    },
+)
+async def get_session_feedback(
+    session_id: Annotated[
+        str,
+        Path(
+            description="Session ID",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ],
+    redis: RedisDep,
+    user: CurrentUserDep,
+    _rate_limit: Annotated[None, Depends(rate_limit_standard)] = None,
+) -> list[dict[str, Any]]:
+    """Get all feedback submitted for a research session.
+
+    Returns a list of feedback records including ratings, comments,
+    and categorical labels.
+    """
+    from ci.evaluation.feedback_store import FeedbackStore
+
+    # Verify session exists and user has access
+    cached = await redis.hgetall(f"interaction:{session_id}")
+
+    if not cached:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+
+    # Verify ownership (unless admin)
+    session_user_id = cached.get("user_id")
+    if session_user_id != user.id and not getattr(user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this session",
+        )
+
+    # Get feedback from store
+    feedback_store = FeedbackStore(redis=redis, db_pool=None)
+    feedback_records = await feedback_store.get_feedback(session_id)
+
+    return feedback_records
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
@@ -906,4 +1172,6 @@ __all__ = [
     "InteractionListResponse",
     "HealthResponse",
     "ErrorResponse",
+    "FeedbackRequest",
+    "FeedbackResponse",
 ]
