@@ -23,6 +23,7 @@ from .base import (
     LLMClient,
     timestamp_now,
 )
+from src.tools.bias_detector import BiasDetector, BiasReport, create_bias_detector
 
 if TYPE_CHECKING:
     from ..orchestrator.state import (
@@ -189,6 +190,7 @@ class CriticAgent(BaseAgent):
         min_quality_threshold: float = 0.6,
         require_source_diversity: bool = True,
         min_unique_sources: int = 3,
+        high_bias_threshold: float = 0.7,
     ):
         """
         Initialize the critic agent.
@@ -201,6 +203,7 @@ class CriticAgent(BaseAgent):
             min_quality_threshold: Minimum quality score for completion
             require_source_diversity: Whether to require diverse sources
             min_unique_sources: Minimum unique source domains required
+            high_bias_threshold: Threshold above which bias is considered high (0.0-1.0)
         """
         super().__init__(
             llm_client=llm_client,
@@ -212,6 +215,8 @@ class CriticAgent(BaseAgent):
         self._min_quality = min_quality_threshold
         self._require_diversity = require_source_diversity
         self._min_unique_sources = min_unique_sources
+        self._high_bias_threshold = high_bias_threshold
+        self._bias_detector = create_bias_detector()
 
     # =========================================================================
     # Required Abstract Properties
@@ -263,6 +268,7 @@ class CriticAgent(BaseAgent):
                     "overall_quality_score": 0.0,
                     "ready_for_report": False,
                     "requires_iteration": True,
+                    "bias_report": None,
                 },
                 agent_name=self.name,
                 tokens_used=0,
@@ -270,6 +276,10 @@ class CriticAgent(BaseAgent):
 
         # Perform pre-analysis
         pre_analysis = self._pre_analyze(findings, citations, state)
+
+        # Run bias analysis
+        bias_report = self._analyze_bias(citations, findings, synthesis)
+        pre_analysis["bias_report"] = bias_report
 
         # Format prompt
         prompt = self._format_critique_prompt(state, pre_analysis)
@@ -286,6 +296,12 @@ class CriticAgent(BaseAgent):
 
             # Merge with pre-analysis results
             data = self._merge_with_pre_analysis(data, pre_analysis)
+
+            # Add bias-related gaps if high bias detected
+            data = self._add_bias_gaps(data, bias_report)
+
+            # Include bias_report in response data
+            data["bias_report"] = bias_report
 
             # Determine if ready for report
             data["ready_for_report"] = self._check_ready_for_report(data, state)
@@ -462,6 +478,106 @@ class CriticAgent(BaseAgent):
 
         return llm_critique
 
+    def _analyze_bias(
+        self,
+        citations: list[CitationRecord],
+        findings: list[Finding],
+        synthesis: str,
+    ) -> BiasReport:
+        """
+        Run bias analysis on citations and findings.
+
+        Args:
+            citations: All citations from the research
+            findings: All findings from the research
+            synthesis: Current synthesis text for content analysis
+
+        Returns:
+            BiasReport with diversity metrics and bias indicators
+        """
+        # Prepare content samples from synthesis for bias indicator detection
+        content_samples = [synthesis] if synthesis else []
+
+        bias_report = self._bias_detector.analyze(
+            citations=citations,
+            findings=findings,
+            content_samples=content_samples,
+        )
+
+        logger.info(
+            f"Bias analysis complete: "
+            f"overall_bias={bias_report['overall_bias_score']:.3f}, "
+            f"risk_level={bias_report['risk_level']}, "
+            f"diversity={bias_report['diversity']['overall_score']:.3f}"
+        )
+
+        return bias_report
+
+    def _add_bias_gaps(
+        self,
+        critique_data: dict[str, Any],
+        bias_report: BiasReport,
+    ) -> dict[str, Any]:
+        """
+        Add bias-related gaps to the critique if high bias detected.
+
+        Args:
+            critique_data: Current critique data dict
+            bias_report: BiasReport from bias analysis
+
+        Returns:
+            Updated critique_data with bias-related gaps added
+        """
+        gaps = critique_data.get("gaps", [])
+
+        overall_bias = bias_report["overall_bias_score"]
+        risk_level = bias_report["risk_level"]
+        diversity = bias_report["diversity"]
+
+        # Add gap for high overall bias
+        if overall_bias >= self._high_bias_threshold:
+            gaps.append({
+                "description": (
+                    f"High bias detected in sources (score: {overall_bias:.2f}). "
+                    "Consider diversifying sources to reduce potential bias."
+                ),
+                "severity": "high" if risk_level == "high" else "medium",
+                "suggested_action": "Search for alternative perspectives and authoritative sources",
+                "related_to_query": True,
+                "bias_related": True,
+            })
+            logger.warning(
+                f"High bias detected: overall_bias={overall_bias:.3f} >= threshold={self._high_bias_threshold}"
+            )
+
+        # Add gaps from diversity recommendations
+        for recommendation in diversity.get("recommendations", []):
+            gaps.append({
+                "description": recommendation,
+                "severity": "medium",
+                "suggested_action": "Address source diversity",
+                "related_to_query": True,
+                "bias_related": True,
+            })
+
+        # Add gap for low viewpoint balance
+        viewpoint_balance = bias_report["viewpoint_assessment"]["balance_score"]
+        if viewpoint_balance < 0.3:
+            coverage_gaps = bias_report["viewpoint_assessment"].get("coverage_gaps", [])
+            gaps.append({
+                "description": (
+                    f"Low viewpoint diversity (balance: {viewpoint_balance:.2f}). "
+                    f"Missing perspectives: {', '.join(coverage_gaps[:3]) if coverage_gaps else 'various'}"
+                ),
+                "severity": "medium",
+                "suggested_action": "Search for alternative viewpoints on the topic",
+                "related_to_query": True,
+                "bias_related": True,
+            })
+
+        critique_data["gaps"] = gaps
+        return critique_data
+
     def _create_fallback_critique(
         self,
         pre_analysis: dict[str, Any],
@@ -586,6 +702,12 @@ class CriticAgent(BaseAgent):
             else:
                 gaps.append(str(gap))
 
+        # Extract bias report and score
+        bias_report = data.get("bias_report")
+        bias_score = 0.0
+        if bias_report:
+            bias_score = bias_report.get("overall_bias_score", 0.0)
+
         # Build quality metrics
         quality_metrics: QualityMetrics = {
             "coverage_score": data.get("coverage_assessment", {}).get("score", 0),
@@ -595,6 +717,7 @@ class CriticAgent(BaseAgent):
             "unique_sources": data.get("source_stats", {}).get("unique_domains", 0),
             "citation_density": 0,  # Would need to calculate from synthesis
             "consistency_score": data.get("overall_quality_score", 0),
+            "bias_score": bias_score,
             "updated_at": timestamp_now(),
         }
 
@@ -622,6 +745,7 @@ class CriticAgent(BaseAgent):
             **state,
             "gaps": gaps,
             "quality_metrics": quality_metrics,
+            "bias_report": bias_report,
             "plan": plan,
             "current_phase": next_phase,
             "should_terminate": ready_for_report,

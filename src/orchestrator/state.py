@@ -16,6 +16,9 @@ from typing import Annotated, Any, Literal, TypedDict
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 
+from src.models.knowledge import Claim, Entity, Relation
+from src.tools.bias_detector import BiasReport
+
 
 # =============================================================================
 # Agent Type Definitions
@@ -274,8 +277,41 @@ class QualityMetrics(TypedDict):
     # Factual consistency score
     consistency_score: float
 
+    # Bias score from BiasDetector (0.0-1.0, higher = more bias)
+    bias_score: float
+
     # Last update timestamp
     updated_at: str
+
+
+# =============================================================================
+# KnowledgeGraph State TypedDict
+# =============================================================================
+
+
+class KnowledgeGraphState(TypedDict):
+    """
+    Serialized knowledge graph for checkpointing.
+
+    The KnowledgeGraph class cannot be directly stored in LangGraph state
+    because it's a class, not a TypedDict. This TypedDict provides a
+    serialized representation that can be checkpointed with AsyncPostgresSaver
+    and reconstructed when a workflow resumes.
+
+    Contains:
+    - entities: All entities (nodes) in the knowledge graph
+    - relations: All relations (edges) between entities
+    - claims: All factual claims extracted from research
+    """
+
+    # Serialized entities from KnowledgeGraph._entities.values()
+    entities: list[Entity]
+
+    # Serialized relations from KnowledgeGraph._relations.values()
+    relations: list[Relation]
+
+    # Serialized claims from KnowledgeGraph._claims.values()
+    claims: list[Claim]
 
 
 # =============================================================================
@@ -365,6 +401,17 @@ class AgentState(TypedDict):
     # Aggregated quality metrics
     quality_metrics: QualityMetrics | None
 
+    # Bias analysis report from BiasDetector
+    bias_report: BiasReport | None
+
+    # =========================================================================
+    # Knowledge Graph
+    # =========================================================================
+
+    # Serialized knowledge graph for checkpointing
+    # Contains entities, relations, and claims extracted during synthesis
+    knowledge_graph: KnowledgeGraphState
+
     # =========================================================================
     # Policy & Safety
     # =========================================================================
@@ -418,6 +465,20 @@ class AgentState(TypedDict):
 # =============================================================================
 
 
+def create_empty_knowledge_graph() -> KnowledgeGraphState:
+    """
+    Create an empty knowledge graph state structure.
+
+    Returns:
+        Empty KnowledgeGraphState ready for checkpointing
+    """
+    return KnowledgeGraphState(
+        entities=[],
+        relations=[],
+        claims=[],
+    )
+
+
 def create_initial_state(
     session_id: str,
     user_query: str,
@@ -466,6 +527,8 @@ def create_initial_state(
         max_iterations=max_iterations,
         gaps=[],
         quality_metrics=None,
+        bias_report=None,
+        knowledge_graph=create_empty_knowledge_graph(),
         policy_violations=[],
         blocked=False,
         token_budget=token_budget,
@@ -727,10 +790,12 @@ __all__ = [
     "Finding",
     "SteerabilityParams",
     "QualityMetrics",
+    "KnowledgeGraphState",
     "AgentState",
     # Factory functions
     "create_initial_state",
     "create_empty_plan",
+    "create_empty_knowledge_graph",
     "create_subtask",
     "create_finding",
     "create_citation",
