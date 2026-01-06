@@ -168,6 +168,7 @@ services:
     volumes:
       - ../src:/app/src:ro
       - ../.env:/app/.env:ro
+      - ../frontend:/app/frontend:ro
 
   # =============================================================================
   # Nginx for serving frontend and proxying API

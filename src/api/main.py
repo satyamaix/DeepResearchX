@@ -14,11 +14,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.api.dependencies import close_redis_pool
@@ -427,18 +430,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(router)
     app.include_router(replay_router)
 
-    # Add root redirect to docs
-    @app.get("/", include_in_schema=False)
-    async def root():
-        """Redirect root to API documentation."""
-        return JSONResponse(
-            content={
-                "name": API_TITLE,
-                "version": API_VERSION,
-                "docs": "/docs" if settings.DEBUG else "Disabled in production",
-                "health": "/api/v1/health",
-            }
-        )
+    # Serve frontend static files
+    # Try Docker path first, then local development path
+    frontend_path = Path("/app/frontend")
+    if not frontend_path.exists():
+        frontend_path = Path(__file__).parent.parent.parent / "frontend"
+    if frontend_path.exists():
+        # Mount static files (CSS, JS)
+        app.mount("/css", StaticFiles(directory=frontend_path / "css"), name="css")
+        app.mount("/js", StaticFiles(directory=frontend_path / "js"), name="js")
+
+        @app.get("/", include_in_schema=False)
+        async def serve_frontend():
+            """Serve the frontend application."""
+            return FileResponse(frontend_path / "index.html")
+
+        @app.get("/index.html", include_in_schema=False)
+        async def serve_index():
+            """Serve the frontend index.html."""
+            return FileResponse(frontend_path / "index.html")
+
+        logger.info(f"Frontend mounted from {frontend_path}")
+    else:
+        # Fallback: API info when frontend not available
+        @app.get("/", include_in_schema=False)
+        async def root():
+            """Redirect root to API documentation."""
+            return JSONResponse(
+                content={
+                    "name": API_TITLE,
+                    "version": API_VERSION,
+                    "docs": "/docs" if settings.DEBUG else "Disabled in production",
+                    "health": "/api/v1/health",
+                }
+            )
 
     # Instrument with Phoenix/OpenTelemetry if available
     try:
